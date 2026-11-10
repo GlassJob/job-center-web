@@ -30,10 +30,9 @@
                 <div class="n">{{ service.credential_count }}</div>
                 <div class="l">凭据</div>
               </div>
-              <div class="count jc-card is-static">
+              <div class="count jc-card" @click="tab = 'instances'">
                 <div class="n">{{ service.instance_count }}</div>
-                <div class="l">在线实例</div>
-                <div class="hint">管理端不提供实例列表接口</div>
+                <div class="l">实例</div>
               </div>
             </div>
             <div class="jc-card info">
@@ -58,6 +57,9 @@
         </el-tab-pane>
         <el-tab-pane label="凭据" name="credentials">
           <ServiceCredentialsPanel v-if="tab === 'credentials'" :service-id="service.id" />
+        </el-tab-pane>
+        <el-tab-pane label="实例" name="instances">
+          <ServiceInstancesPanel v-if="tab === 'instances'" :service-id="service.id" />
         </el-tab-pane>
       </el-tabs>
     </template>
@@ -99,6 +101,7 @@ import EntityHeader from '@/components/EntityHeader.vue'
 import StatusTag from '@/components/StatusTag.vue'
 import ServiceJobsPanel from '@/views/panels/ServiceJobsPanel.vue'
 import ServiceCredentialsPanel from '@/views/panels/ServiceCredentialsPanel.vue'
+import ServiceInstancesPanel from '@/views/panels/ServiceInstancesPanel.vue'
 
 const route = useRoute()
 const router = useRouter()

@@ -30,7 +30,22 @@
           <el-input v-model="idempotencyKey" placeholder="可选 idempotency_key" />
         </el-form-item>
         <el-form-item label="指定实例">
-          <el-input v-model="instanceId" placeholder="可选 instance_id" />
+          <el-select
+            v-model="instanceId"
+            clearable
+            filterable
+            allow-create
+            default-first-option
+            placeholder="可选，优先列出已注册该任务的在线实例"
+            style="width: 360px"
+          >
+            <el-option
+              v-for="item in instanceOptions"
+              :key="item.id"
+              :label="instanceLabel(item)"
+              :value="item.id"
+            />
+          </el-select>
         </el-form-item>
         <el-form-item>
           <el-button type="primary" :loading="triggering" @click="onTrigger">触发执行</el-button>
@@ -71,8 +86,8 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { executionsApi, schedulesApi } from '@/api'
-import type { ScheduleView } from '@/api/types'
+import { executionsApi, instancesApi, schedulesApi } from '@/api'
+import type { InstanceView, ScheduleView } from '@/api/types'
 import { toastError } from '@/utils/feedback'
 import { prettyJson } from '@/utils/json'
 import { formatTime } from '@/utils/time'
@@ -84,6 +99,7 @@ const props = defineProps<{ serviceId: string; jobId: string }>()
 const router = useRouter()
 const session = useSessionStore()
 const schedules = ref<ScheduleView[]>([])
+const instances = ref<InstanceView[]>([])
 const prefillId = ref('')
 const paramsText = ref('{}')
 const idempotencyKey = ref('')
@@ -94,12 +110,38 @@ const paramsEditor = ref<InstanceType<typeof JsonEditor>>()
 
 const recent = computed(() => session.listForJob(props.serviceId, props.jobId))
 
+const instanceOptions = computed(() => {
+  const registered = instances.value.filter((item) =>
+    (item.jobs || []).some((job) => job.job_id === props.jobId),
+  )
+  const rest = instances.value.filter((item) => !registered.includes(item))
+  const ranked = (list: InstanceView[]) =>
+    [...list].sort((a, b) => Number(b.status === 'ONLINE') - Number(a.status === 'ONLINE'))
+  return [...ranked(registered), ...ranked(rest)]
+})
+
+function instanceLabel(item: InstanceView) {
+  const bits = [item.instance_key || item.id]
+  if (item.hostname) bits.push(item.hostname)
+  if (item.status) bits.push(item.status)
+  return bits.join(' · ')
+}
+
 async function loadSchedules() {
   try {
     const res = await schedulesApi.list(props.serviceId, props.jobId, { page: 1, limit: 50 })
     schedules.value = res.list
   } catch {
     schedules.value = []
+  }
+}
+
+async function loadInstances() {
+  try {
+    const res = await instancesApi.list(props.serviceId, { page: 1, limit: 100 })
+    instances.value = res.list
+  } catch {
+    instances.value = []
   }
 }
 
@@ -160,6 +202,7 @@ async function onTrigger() {
 
 onMounted(() => {
   void loadSchedules()
+  void loadInstances()
 })
 </script>
 

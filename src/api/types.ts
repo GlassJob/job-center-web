@@ -317,6 +317,55 @@ export interface ExecutionView {
   attempt?: AttemptView | null
 }
 
+export interface InstanceJobView {
+  job_id: string
+  job_code: string
+  handler_version: string
+  max_concurrency?: number
+  registered_at: string
+}
+
+export interface InstanceView {
+  id: string
+  service_id: string
+  instance_key: string
+  session_id?: string
+  session_epoch: number
+  environment?: string
+  hostname?: string
+  ip_address?: string
+  reported_ip?: string
+  pid?: number | null
+  language?: string
+  runtime_version?: string
+  sdk_version?: string
+  protocol_version?: string
+  app_version?: string
+  git_commit?: string
+  build_time?: string | null
+  started_at: string
+  registered_at: string
+  connected_at?: string | null
+  disconnected_at?: string | null
+  last_heartbeat_at?: string | null
+  status: string
+  max_concurrency: number
+  running_count: number
+  gateway_node_id?: string
+  metadata?: Record<string, unknown>
+  created_at: string
+  updated_at: string
+  jobs?: InstanceJobView[]
+}
+
+export const INSTANCE_STATUSES = [
+  'REGISTERING',
+  'ONLINE',
+  'SUSPECT',
+  'OFFLINE',
+  'DRAINING',
+] as const
+
 export interface ClientView {
   id: string
   name: string
@@ -407,6 +456,7 @@ export const CLIENT_SCOPE_OPTIONS = [
   { value: 'job.state.manage', label: '游标/状态管理' },
   { value: 'job.credential.view', label: '凭据查看' },
   { value: 'job.credential.manage', label: '凭据管理' },
+  { value: 'job.instance.view', label: '实例查看' },
   { value: 'job.client.view', label: '客户端查看' },
   { value: 'job.client.manage', label: '客户端管理' },
   { value: 'job.audit.view', label: '审计查看' },

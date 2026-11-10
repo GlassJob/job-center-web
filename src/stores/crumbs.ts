@@ -4,6 +4,7 @@ import { defineStore } from 'pinia'
 export const useCrumbsStore = defineStore('crumbs', () => {
   const serviceTitle = ref('')
   const jobTitle = ref('')
+  const instanceTitle = ref('')
 
   function setServiceTitle(title: string) {
     serviceTitle.value = title
@@ -13,5 +14,16 @@ export const useCrumbsStore = defineStore('crumbs', () => {
     jobTitle.value = title
   }
 
-  return { serviceTitle, jobTitle, setServiceTitle, setJobTitle }
+  function setInstanceTitle(title: string) {
+    instanceTitle.value = title
+  }
+
+  return {
+    serviceTitle,
+    jobTitle,
+    instanceTitle,
+    setServiceTitle,
+    setJobTitle,
+    setInstanceTitle,
+  }
 })

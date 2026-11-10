@@ -19,6 +19,7 @@ import type {
   DeleteServiceResult,
   ExecutionView,
   HealthStatus,
+  InstanceView,
   JobStateView,
   JobView,
   ListResult,
@@ -177,6 +178,17 @@ export const executionsApi = {
       `/v1/admin/services/${serviceId}/jobs/${jobId}/executions/${executionId}/cancel`,
       { body },
     ),
+}
+
+export const instancesApi = {
+  list: (serviceId: string, query: PageQuery = {}) =>
+    request<ListResult<InstanceView>>(
+      'GET',
+      `/v1/admin/services/${serviceId}/instances`,
+      { query },
+    ).then(normalizeList),
+  get: (serviceId: string, instanceId: string) =>
+    request<InstanceView>('GET', `/v1/admin/services/${serviceId}/instances/${instanceId}`),
 }
 
 export const clientsApi = {

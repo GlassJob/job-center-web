@@ -170,6 +170,7 @@ function syncCrumbs() {
   const path = route.path
   const serviceName = crumbsStore.serviceTitle || '服务'
   const jobName = crumbsStore.jobTitle || '任务'
+  const instanceName = crumbsStore.instanceTitle || '实例'
   if (path === '/') {
     crumbs.value = [{ title: '概览' }]
     return
@@ -183,6 +184,9 @@ function syncCrumbs() {
       { title: '服务', to: '/services' },
       { title: serviceName, to: `/services/${route.params.serviceId as string}` },
     ]
+    if (route.params.instanceId) {
+      segs.push({ title: instanceName })
+    }
     if (route.params.jobId) {
       segs.push({
         title: jobName,
@@ -201,7 +205,7 @@ function syncCrumbs() {
   crumbs.value = staticCrumb
 }
 
-watch([() => route.fullPath, () => crumbsStore.serviceTitle, () => crumbsStore.jobTitle], syncCrumbs, { immediate: true })
+watch([() => route.fullPath, () => crumbsStore.serviceTitle, () => crumbsStore.jobTitle, () => crumbsStore.instanceTitle], syncCrumbs, { immediate: true })
 </script>
 
 <style scoped>

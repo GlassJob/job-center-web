@@ -74,7 +74,13 @@
                 <dt>状态</dt>
                 <dd><StatusTag :status="execution.attempt.status" /></dd>
                 <dt>实例</dt>
-                <dd>{{ execution.attempt.instance_key || execution.attempt.instance_id || '—' }}</dd>
+                <dd>
+                  <router-link
+                    v-if="execution.attempt.instance_id"
+                    :to="`/services/${serviceId}/instances/${execution.attempt.instance_id}`"
+                  >{{ execution.attempt.instance_key || execution.attempt.instance_id }}</router-link>
+                  <template v-else>{{ execution.attempt.instance_key || '—' }}</template>
+                </dd>
                 <dt>进度</dt>
                 <dd>
                   <template v-if="execution.attempt.progress_percent != null">
