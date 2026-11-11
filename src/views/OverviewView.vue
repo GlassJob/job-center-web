@@ -1,8 +1,8 @@
 <template>
   <div class="jc-page">
-    <PageHeader title="概览" description="查看 Job Center 连接状态与服务规模。">
-      <el-button @click="load">刷新</el-button>
-      <el-button type="primary" @click="$router.push('/services')">管理服务</el-button>
+    <PageHeader title="运行概览" description="先看集群是否健康、有哪些调度即将触发，再进入任务管理做日常操作。">
+      <el-button @click="reload">刷新</el-button>
+      <el-button type="primary" @click="$router.push('/jobs')">任务管理</el-button>
     </PageHeader>
 
     <el-alert
@@ -11,141 +11,178 @@
       show-icon
       :closable="false"
       title="尚未配置管理端凭证"
-      description="请先到「连接设置」填写 Client ID / Secret。健康检查无需签名，但服务列表需要 HMAC。"
+      description="请先到「连接设置」填写 Client ID / Secret。健康检查无需签名，但任务与实例数据需要 HMAC。"
       style="border-radius: 10px"
     />
 
     <div class="stat-grid">
-      <div class="stat jc-card">
-        <div class="stat-label">存活检查</div>
-        <div class="stat-value" :class="tone(liveOk)">{{ liveOk == null ? '—' : liveOk ? 'OK' : '失败' }}</div>
-        <div class="stat-sub">GET /health/live</div>
-      </div>
-      <div class="stat jc-card">
-        <div class="stat-label">就绪检查</div>
-        <div class="stat-value" :class="tone(readyOk)">{{ readyOk == null ? '—' : readyOk ? 'OK' : '失败' }}</div>
-        <div class="stat-sub">GET /health/ready</div>
-      </div>
-      <div class="stat jc-card">
+      <button class="stat jc-card" type="button" @click="$router.push('/services')">
         <div class="stat-label">服务</div>
-        <div class="stat-value">{{ serviceTotal == null ? '—' : serviceTotal }}</div>
-        <div class="stat-sub">已注册服务总数</div>
-      </div>
-      <div class="stat jc-card">
+        <div class="stat-value">{{ dash(cluster.services.length) }}</div>
+        <div class="stat-sub">已注册执行器 / 应用</div>
+      </button>
+      <button class="stat jc-card" type="button" @click="$router.push('/jobs')">
         <div class="stat-label">任务</div>
-        <div class="stat-value">{{ jobTotalLabel }}</div>
-        <div class="stat-sub">{{ jobHint }}</div>
+        <div class="stat-value">{{ dash(cluster.jobs.length) }}</div>
+        <div class="stat-sub">启用 {{ cluster.enabledJobs.length }} 个</div>
+      </button>
+      <button class="stat jc-card" type="button" @click="$router.push('/instances')">
+        <div class="stat-label">在线实例</div>
+        <div class="stat-value" :class="{ ok: cluster.onlineInstances.length > 0 }">
+          {{ dash(cluster.onlineInstances.length) }}
+        </div>
+        <div class="stat-sub">共 {{ cluster.instances.length }} 个实例</div>
+      </button>
+      <button class="stat jc-card" type="button" @click="$router.push('/instances')">
+        <div class="stat-label">异常实例</div>
+        <div class="stat-value" :class="{ bad: cluster.unhealthyInstances.length > 0 }">
+          {{ dash(cluster.unhealthyInstances.length) }}
+        </div>
+        <div class="stat-sub">非 ONLINE 的执行器</div>
+      </button>
+    </div>
+
+    <div class="stat-grid reserved-grid">
+      <div class="stat jc-card reserved">
+        <div class="stat-label">今日调度</div>
+        <div class="stat-value muted">—</div>
+        <div class="stat-sub">待接入概览统计接口</div>
+      </div>
+      <div class="stat jc-card reserved">
+        <div class="stat-label">今日成功 / 失败</div>
+        <div class="stat-value muted">— / —</div>
+        <div class="stat-sub">待接入执行汇总</div>
+      </div>
+      <div class="stat jc-card reserved">
+        <div class="stat-label">运行中</div>
+        <div class="stat-value muted">—</div>
+        <div class="stat-sub">待接入执行列表</div>
+      </div>
+      <div class="stat jc-card reserved">
+        <div class="stat-label">存活 / 就绪</div>
+        <div class="stat-value" :class="tone(liveOk && readyOk)">
+          {{ healthText }}
+        </div>
+        <div class="stat-sub">调度中心自身健康检查</div>
+      </div>
+    </div>
+
+    <div class="split">
+      <div class="jc-card list-card">
+        <div class="list-head">
+          <h3>即将触发</h3>
+          <el-button link type="primary" @click="$router.push('/jobs')">全部任务</el-button>
+        </div>
+        <el-empty v-if="!cluster.loading && cluster.upcomingSchedules.length === 0" description="没有已启用且带下次触发时间的调度" />
+        <el-table v-else :data="cluster.upcomingSchedules" @row-click="goJob">
+          <el-table-column label="任务" min-width="180">
+            <template #default="{ row }">
+              <div class="name">{{ row.job.name }}</div>
+              <div class="jc-code">{{ row.job.code }}</div>
+            </template>
+          </el-table-column>
+          <el-table-column label="服务" min-width="120">
+            <template #default="{ row }">{{ row.service.name }}</template>
+          </el-table-column>
+          <el-table-column label="Cron" min-width="140" show-overflow-tooltip>
+            <template #default="{ row }">{{ row.schedule.cron_expression || '—' }}</template>
+          </el-table-column>
+          <el-table-column label="下次触发" width="180">
+            <template #default="{ row }">{{ formatTime(row.next) }}</template>
+          </el-table-column>
+        </el-table>
+      </div>
+
+      <div class="jc-card list-card">
+        <div class="list-head">
+          <h3>异常实例</h3>
+          <el-button link type="primary" @click="$router.push('/instances')">全部实例</el-button>
+        </div>
+        <el-empty v-if="!cluster.loading && cluster.unhealthyInstances.length === 0" description="当前没有非在线实例" />
+        <el-table v-else :data="cluster.unhealthyInstances.slice(0, 8)" @row-click="goInstance">
+          <el-table-column label="实例" min-width="140">
+            <template #default="{ row }">{{ row.instance.instance_key || row.instance.id }}</template>
+          </el-table-column>
+          <el-table-column label="服务" min-width="110">
+            <template #default="{ row }">{{ row.service.name }}</template>
+          </el-table-column>
+          <el-table-column label="状态" width="110">
+            <template #default="{ row }"><StatusTag :status="row.instance.status" /></template>
+          </el-table-column>
+        </el-table>
       </div>
     </div>
 
     <div class="jc-card list-card">
       <div class="list-head">
-        <h3>服务一览</h3>
-        <el-button link type="primary" @click="$router.push('/services')">查看全部</el-button>
+        <h3>最近失败</h3>
+        <el-button link type="primary" disabled>执行记录</el-button>
       </div>
-      <el-empty v-if="!loading && services.length === 0" description="暂无服务，或尚未通过签名校验" />
-      <div v-else class="cards">
-        <button
-          v-for="item in services"
-          :key="item.id"
-          class="svc"
-          type="button"
-          @click="$router.push(`/services/${item.id}`)"
-        >
-          <div class="svc-top">
-            <div class="tile">{{ item.name.slice(0, 1).toUpperCase() }}</div>
-            <StatusTag :status="item.status" />
-          </div>
-          <div class="svc-name">{{ item.name }}</div>
-          <div class="jc-code">{{ item.code }}</div>
-          <div v-if="item.description" class="svc-desc">{{ item.description }}</div>
-        </button>
-      </div>
+      <el-empty description="执行列表接口就绪后，这里会列出最近失败的任务，并跳转到执行详情和日志。" />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { healthApi, servicesApi } from '@/api'
-import type { Service } from '@/api/types'
-import { toastError } from '@/utils/feedback'
+import { useRouter } from 'vue-router'
+import { healthApi } from '@/api'
+import type { JobView, Service } from '@/api/types'
+import { useClusterStore } from '@/stores/cluster'
 import { useSettingsStore } from '@/stores/settings'
+import { formatTime } from '@/utils/time'
 import PageHeader from '@/components/PageHeader.vue'
 import StatusTag from '@/components/StatusTag.vue'
 
 const settings = useSettingsStore()
-const loading = ref(false)
+const cluster = useClusterStore()
+const router = useRouter()
 const liveOk = ref<boolean | null>(null)
 const readyOk = ref<boolean | null>(null)
-const services = ref<Service[]>([])
-const serviceTotal = ref<number | null>(null)
-const jobTotal = ref<number | null>(null)
-const jobsComplete = ref(false)
 
-const jobTotalLabel = computed(() => {
-  if (jobTotal.value == null) return '—'
-  return jobsComplete.value ? String(jobTotal.value) : `${jobTotal.value}+`
+const healthText = computed(() => {
+  if (liveOk.value == null) return '—'
+  if (liveOk.value && readyOk.value) return 'OK'
+  if (liveOk.value) return '未就绪'
+  return '失败'
 })
 
-const jobHint = computed(() => {
-  if (jobTotal.value == null) return '需先连接后统计'
-  return jobsComplete.value ? '各服务任务数合计' : '服务较多，仅展示首页合计下限'
-})
+function dash(n: number) {
+  if (cluster.loading && !cluster.loadedAt) return '—'
+  return String(n)
+}
 
 function tone(ok: boolean | null): string {
   if (ok == null) return ''
   return ok ? 'ok' : 'bad'
 }
 
-async function load() {
-  loading.value = true
-  liveOk.value = null
-  readyOk.value = null
+function goJob(row: { job: JobView; service: Service }) {
+  void router.push(`/services/${row.service.id}/jobs/${row.job.id}`)
+}
+
+function goInstance(row: { instance: { id: string }; service: { id: string } }) {
+  void router.push(`/services/${row.service.id}/instances/${row.instance.id}`)
+}
+
+async function reload() {
   try {
-    try {
-      liveOk.value = (await healthApi.live()).status === 'ok'
-    } catch {
-      liveOk.value = false
-    }
-    try {
-      readyOk.value = (await healthApi.ready()).status === 'ok'
-    } catch {
-      readyOk.value = false
-    }
-
-    if (!settings.hasCredentials) {
-      services.value = []
-      serviceTotal.value = null
-      jobTotal.value = null
-      return
-    }
-
-    const list = await servicesApi.list({ page: 1, limit: 20 })
-    services.value = list.list
-    serviceTotal.value = list.total
-
-    if (list.total === 0) {
-      jobTotal.value = 0
-      jobsComplete.value = true
-    } else if (list.total <= 20) {
-      const details = await Promise.all(list.list.map((s) => servicesApi.get(s.id)))
-      jobTotal.value = details.reduce((sum, d) => sum + (d.job_count || 0), 0)
-      jobsComplete.value = true
-    } else {
-      const details = await Promise.all(list.list.map((s) => servicesApi.get(s.id)))
-      jobTotal.value = details.reduce((sum, d) => sum + (d.job_count || 0), 0)
-      jobsComplete.value = false
-    }
-  } catch (err) {
-    toastError(err, '加载概览失败')
-  } finally {
-    loading.value = false
+    liveOk.value = (await healthApi.live()).status === 'ok'
+  } catch {
+    liveOk.value = false
+  }
+  try {
+    readyOk.value = (await healthApi.ready()).status === 'ok'
+  } catch {
+    readyOk.value = false
+  }
+  if (settings.hasCredentials) {
+    await cluster.refresh(true)
   }
 }
 
 onMounted(() => {
-  void load()
+  void reload()
 })
 </script>
 
@@ -155,14 +192,18 @@ onMounted(() => {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 14px;
 }
+.reserved-grid { margin-top: 0; }
 @media (max-width: 1100px) {
-  .stat-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
+  .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 .stat {
   padding: 18px 20px;
+  text-align: left;
+  border: 1px solid var(--jc-border);
+  background: #fff;
+  cursor: pointer;
 }
+.stat.reserved { cursor: default; }
 .stat-label {
   color: var(--jc-text-muted);
   font-size: 12px;
@@ -174,75 +215,29 @@ onMounted(() => {
   font-weight: 700;
   letter-spacing: -0.03em;
 }
-.stat-value.ok {
-  color: var(--jc-success);
-}
-.stat-value.bad {
-  color: var(--jc-danger);
-}
+.stat-value.ok { color: var(--jc-success); }
+.stat-value.bad { color: var(--jc-danger); }
+.stat-value.muted { color: var(--jc-text-muted); }
 .stat-sub {
   margin-top: 4px;
   color: var(--jc-text-secondary);
   font-size: 12px;
 }
-.list-card {
-  padding: 18px 20px 20px;
+.split {
+  display: grid;
+  grid-template-columns: 1.3fr 0.9fr;
+  gap: 14px;
 }
+@media (max-width: 1100px) {
+  .split { grid-template-columns: 1fr; }
+}
+.list-card { padding: 18px 20px 20px; }
 .list-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 12px;
 }
-.list-head h3 {
-  margin: 0;
-  font-size: 15px;
-}
-.cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 12px;
-}
-.svc {
-  text-align: left;
-  border: 1px solid var(--jc-border);
-  background: #fff;
-  border-radius: 10px;
-  padding: 14px;
-  cursor: pointer;
-}
-.svc:hover {
-  border-color: var(--jc-primary-mid);
-  box-shadow: var(--jc-shadow);
-}
-.svc-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-}
-.tile {
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
-  background: var(--jc-primary-soft);
-  color: var(--jc-primary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-}
-.svc-name {
-  margin-top: 10px;
-  font-weight: 650;
-  font-size: 15px;
-}
-.svc-desc {
-  margin-top: 6px;
-  color: var(--jc-text-secondary);
-  font-size: 12px;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
+.list-head h3 { margin: 0; font-size: 15px; }
+.name { font-weight: 600; }
 </style>

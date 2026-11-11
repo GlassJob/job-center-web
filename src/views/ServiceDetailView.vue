@@ -36,6 +36,19 @@
               </div>
             </div>
             <div class="jc-card info">
+              <h3 class="jc-section-title">实例健康</h3>
+              <p class="reserved-hint">在线 {{ onlineInstances }} / 共 {{ instances.length || service.instance_count || 0 }}</p>
+              <div class="inst-pills">
+                <StatusTag v-for="item in instancePreview" :key="item.id" :status="item.status" :label="item.instance_key || item.status" />
+                <span v-if="!instancePreview.length" class="jc-muted">暂无实例</span>
+              </div>
+              <el-button style="margin-top: 10px" @click="tab = 'instances'">查看实例</el-button>
+            </div>
+            <div class="jc-card info">
+              <h3 class="jc-section-title">最近执行</h3>
+              <p class="reserved-hint">按服务筛选的执行列表接口就绪后，这里会显示该服务最近的运行与失败。</p>
+            </div>
+            <div class="jc-card info">
               <h3 class="jc-section-title">基本信息</h3>
               <dl class="jc-kv">
                 <dt>服务 ID</dt>
@@ -88,12 +101,12 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { OfficeBuilding } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import { servicesApi } from '@/api'
-import type { ServiceDetail } from '@/api/types'
+import { instancesApi, servicesApi } from '@/api'
+import type { InstanceView, ServiceDetail } from '@/api/types'
 import { confirmDelete, toastError } from '@/utils/feedback'
 import { formatTimeTzLabel } from '@/utils/time'
 import { useCrumbsStore } from '@/stores/crumbs'
@@ -109,17 +122,25 @@ const crumbs = useCrumbsStore()
 const loading = ref(false)
 const saving = ref(false)
 const service = ref<ServiceDetail | null>(null)
+const instances = ref<InstanceView[]>([])
 const tab = ref((route.query.tab as string) || 'overview')
 const editVisible = ref(false)
 const editForm = reactive({ name: '', description: '', status: 'ACTIVE' })
 
 const serviceId = () => route.params.serviceId as string
+const onlineInstances = computed(() => instances.value.filter((item) => item.status === 'ONLINE').length)
+const instancePreview = computed(() => instances.value.slice(0, 6))
 
 async function load() {
   loading.value = true
   try {
     service.value = await servicesApi.get(serviceId())
     crumbs.setServiceTitle(service.value.name || service.value.code)
+    try {
+      instances.value = (await instancesApi.list(serviceId(), { page: 1, limit: 50 })).list
+    } catch {
+      instances.value = []
+    }
   } catch (err) {
     toastError(err, '加载服务失败')
   } finally {

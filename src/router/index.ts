@@ -13,6 +13,24 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '概览', breadcrumb: [{ title: '概览' }] },
       },
       {
+        path: 'jobs',
+        name: 'jobs',
+        component: () => import('@/views/JobsView.vue'),
+        meta: { title: '任务管理', breadcrumb: [{ title: '任务管理' }] },
+      },
+      {
+        path: 'instances',
+        name: 'instances',
+        component: () => import('@/views/InstancesView.vue'),
+        meta: { title: '实例', breadcrumb: [{ title: '实例' }] },
+      },
+      {
+        path: 'executions',
+        name: 'executions',
+        component: () => import('@/views/ExecutionsView.vue'),
+        meta: { title: '执行记录', breadcrumb: [{ title: '执行记录' }] },
+      },
+      {
         path: 'services',
         name: 'services',
         component: () => import('@/views/ServicesView.vue'),

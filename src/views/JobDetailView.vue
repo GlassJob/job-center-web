@@ -12,6 +12,8 @@
         <template #tags>
           <StatusTag :status="job.enabled ? 'ACTIVE' : 'DISABLED'" :label="job.enabled ? '已启用' : '未启用'" />
         </template>
+        <el-button type="primary" @click="triggerVisible = true">执行一次</el-button>
+        <el-button @click="toggleEnabled">{{ job.enabled ? '停用任务' : '启用任务' }}</el-button>
         <el-button @click="openEdit">编辑</el-button>
         <el-button type="danger" plain @click="onDelete">删除</el-button>
       </EntityHeader>
@@ -57,9 +59,32 @@
                 <dd>{{ formatTimeTzLabel(job.created_at) }} / {{ formatTimeTzLabel(job.updated_at) }}</dd>
               </dl>
             </div>
-            <div class="jc-card info">
-              <h3 class="jc-section-title">参数 Schema</h3>
-              <pre class="json-pre">{{ prettyJson(job.params_schema) || '暂无' }}</pre>
+            <div class="side">
+              <div class="jc-card info">
+                <h3 class="jc-section-title">调度摘要</h3>
+                <el-empty v-if="!schedules.length" description="还没有调度" />
+                <div v-else class="sched-list">
+                  <div v-for="item in schedules" :key="item.id" class="sched">
+                    <div class="sched-top">
+                      <strong>{{ item.name }}</strong>
+                      <StatusTag :status="item.enabled ? 'ACTIVE' : 'DISABLED'" :label="item.enabled ? '运行中' : '已停用'" />
+                    </div>
+                    <div class="jc-code">{{ item.cron_expression || '手动 / API' }}</div>
+                    <div class="jc-muted">下次：{{ formatTimeTzLabel(item.next_fire_at) }}</div>
+                    <div class="jc-muted">上次：{{ formatTimeTzLabel(item.last_fire_at) }}</div>
+                  </div>
+                </div>
+                <el-button style="margin-top: 10px" @click="tab = 'schedules'">管理调度</el-button>
+              </div>
+              <div class="jc-card info">
+                <h3 class="jc-section-title">最近执行</h3>
+                <p class="reserved-hint">执行列表接口就绪后，这里会显示最近若干次运行状态、耗时和日志入口。</p>
+                <el-button type="primary" plain @click="tab = 'executions'">手动触发 / 按 ID 查看</el-button>
+              </div>
+              <div class="jc-card info">
+                <h3 class="jc-section-title">参数 Schema</h3>
+                <pre class="json-pre">{{ prettyJson(job.params_schema) || '暂无' }}</pre>
+              </div>
             </div>
           </div>
         </el-tab-pane>
@@ -106,6 +131,13 @@
         <el-button type="primary" :loading="saving" @click="saveEdit">保存</el-button>
       </template>
     </el-dialog>
+
+    <TriggerJobDialog
+      v-model="triggerVisible"
+      :service-id="serviceId"
+      :job-id="jobId"
+      :job-name="job?.name"
+    />
   </div>
 </template>
 
@@ -114,8 +146,8 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { List } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import { jobsApi, servicesApi } from '@/api'
-import type { JobView } from '@/api/types'
+import { jobsApi, schedulesApi, servicesApi } from '@/api'
+import type { JobView, ScheduleView } from '@/api/types'
 import { confirmDelete, toastError } from '@/utils/feedback'
 import { prettyJson } from '@/utils/json'
 import { formatTimeTzLabel } from '@/utils/time'
@@ -125,6 +157,7 @@ import StatusTag from '@/components/StatusTag.vue'
 import JobSchedulesPanel from '@/views/panels/JobSchedulesPanel.vue'
 import JobStatesPanel from '@/views/panels/JobStatesPanel.vue'
 import JobExecutionsPanel from '@/views/panels/JobExecutionsPanel.vue'
+import TriggerJobDialog from '@/components/TriggerJobDialog.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -134,6 +167,8 @@ const saving = ref(false)
 const job = ref<JobView | null>(null)
 const tab = ref((route.query.tab as string) || 'overview')
 const editVisible = ref(false)
+const triggerVisible = ref(false)
+const schedules = ref<ScheduleView[]>([])
 const editForm = reactive({
   name: '',
   description: '',
@@ -156,6 +191,11 @@ async function load() {
     }
     job.value = await jobsApi.get(serviceId.value, jobId.value)
     crumbs.setJobTitle(job.value.name || job.value.code)
+    try {
+      schedules.value = (await schedulesApi.list(serviceId.value, jobId.value, { page: 1, limit: 20 })).list
+    } catch {
+      schedules.value = []
+    }
   } catch (err) {
     toastError(err, '加载任务失败')
   } finally {
@@ -184,6 +224,18 @@ async function saveEdit() {
     toastError(err, '保存失败')
   } finally {
     saving.value = false
+  }
+}
+
+async function toggleEnabled() {
+  if (!job.value) return
+  const next = !job.value.enabled
+  try {
+    await jobsApi.patch(serviceId.value, jobId.value, { enabled: next })
+    ElMessage.success(next ? '已启用' : '已停用')
+    await load()
+  } catch (err) {
+    toastError(err, '更新失败')
   }
 }
 
@@ -228,6 +280,10 @@ onMounted(() => {
   .overview { grid-template-columns: 1fr; }
 }
 .info { padding: 18px 20px; }
+.side { display: flex; flex-direction: column; gap: 16px; }
+.sched-list { display: flex; flex-direction: column; gap: 12px; }
+.sched-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.reserved-hint { margin: 0 0 10px; color: var(--jc-text-secondary); font-size: 13px; }
 .caps { display: flex; flex-wrap: wrap; gap: 6px; }
 .sep { margin: 0 8px; color: var(--jc-text-muted); }
 </style>

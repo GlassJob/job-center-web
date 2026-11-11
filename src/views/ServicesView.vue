@@ -1,6 +1,6 @@
 <template>
   <div class="jc-page">
-    <PageHeader title="服务" description="管理 Job Center 中的服务及其下属任务与凭据。">
+    <PageHeader title="服务" description="管理执行器 / 应用。列表会补充任务数和实例数，方便直接进入日常运维。">
       <el-button type="primary" @click="openCreate">新建服务</el-button>
     </PageHeader>
 
@@ -30,7 +30,21 @@
             <StatusTag :status="row.status" />
           </template>
         </el-table-column>
-        <el-table-column label="描述" min-width="200" show-overflow-tooltip>
+        <el-table-column label="任务" width="90">
+          <template #default="{ row }">
+            <el-button link type="primary" @click.stop="$router.push(`/jobs?service=${row.id}`)">
+              {{ row.job_count ?? '—' }}
+            </el-button>
+          </template>
+        </el-table-column>
+        <el-table-column label="实例" width="90">
+          <template #default="{ row }">
+            <el-button link type="primary" @click.stop="$router.push(`/services/${row.id}?tab=instances`)">
+              {{ row.instance_count ?? '—' }}
+            </el-button>
+          </template>
+        </el-table-column>
+        <el-table-column label="描述" min-width="180" show-overflow-tooltip>
           <template #default="{ row }">{{ row.description || '—' }}</template>
         </el-table-column>
         <el-table-column label="更新时间" width="180">
@@ -38,6 +52,7 @@
         </el-table-column>
         <el-table-column label="操作" width="200" fixed="right">
           <template #default="{ row }">
+            <el-button link type="primary" @click.stop="$router.push(`/jobs?service=${row.id}`)">任务</el-button>
             <el-button link type="primary" @click.stop="openEdit(row)">编辑</el-button>
             <el-button
               v-if="row.status === 'ACTIVE'"
@@ -96,7 +111,7 @@ import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { servicesApi } from '@/api'
-import type { Service } from '@/api/types'
+import type { Service, ServiceDetail } from '@/api/types'
 import { confirmDelete, toastError } from '@/utils/feedback'
 import { formatTime } from '@/utils/time'
 import PageHeader from '@/components/PageHeader.vue'
@@ -105,7 +120,7 @@ import StatusTag from '@/components/StatusTag.vue'
 const router = useRouter()
 const loading = ref(false)
 const saving = ref(false)
-const list = ref<Service[]>([])
+const list = ref<ServiceDetail[]>([])
 const total = ref(0)
 const page = ref(1)
 const limit = ref(20)
@@ -145,8 +160,16 @@ async function fetchList() {
       page: page.value,
       limit: limit.value,
     })
-    list.value = res.list
     total.value = res.total
+    list.value = await Promise.all(
+      res.list.map(async (item) => {
+        try {
+          return await servicesApi.get(item.id)
+        } catch {
+          return { ...item, job_count: 0, instance_count: 0, credential_count: 0 }
+        }
+      }),
+    )
   } catch (err) {
     toastError(err, '加载服务失败')
   } finally {

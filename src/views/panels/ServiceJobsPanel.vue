@@ -34,11 +34,17 @@
       <el-table-column label="Handler" min-width="160" show-overflow-tooltip>
         <template #default="{ row }">{{ row.handler || '—' }}</template>
       </el-table-column>
+      <el-table-column label="最近执行" width="130">
+        <template #default>
+          <span class="placeholder" title="需 last_execution_* 或执行列表接口">待接入</span>
+        </template>
+      </el-table-column>
       <el-table-column label="更新时间" width="180">
         <template #default="{ row }">{{ formatTime(row.updated_at) }}</template>
       </el-table-column>
-      <el-table-column label="操作" width="160" fixed="right">
+      <el-table-column label="操作" width="210" fixed="right">
         <template #default="{ row }">
+          <el-button link type="primary" @click.stop="openTrigger(row)">执行一次</el-button>
           <el-button link type="primary" @click.stop="openEdit(row)">编辑</el-button>
           <el-button link type="danger" @click.stop="onDelete(row)">删除</el-button>
         </template>
@@ -83,6 +89,13 @@
         <el-button type="primary" :loading="saving" @click="onSubmit">保存</el-button>
       </template>
     </el-dialog>
+
+    <TriggerJobDialog
+      v-model="triggerVisible"
+      :service-id="serviceId"
+      :job-id="triggerJob?.id || ''"
+      :job-name="triggerJob?.name"
+    />
   </div>
 </template>
 
@@ -95,6 +108,7 @@ import type { JobView } from '@/api/types'
 import { confirmDelete, toastError } from '@/utils/feedback'
 import { formatTime } from '@/utils/time'
 import StatusTag from '@/components/StatusTag.vue'
+import TriggerJobDialog from '@/components/TriggerJobDialog.vue'
 
 const props = defineProps<{ serviceId: string }>()
 const router = useRouter()
@@ -108,6 +122,8 @@ const keyword = ref('')
 const status = ref('')
 const enabled = ref('')
 const visible = ref(false)
+const triggerVisible = ref(false)
+const triggerJob = ref<JobView | null>(null)
 const editing = ref<JobView | null>(null)
 const form = reactive({
   code: '',
@@ -144,6 +160,11 @@ async function fetchList() {
 function reload() {
   page.value = 1
   void fetchList()
+}
+
+function openTrigger(row: JobView) {
+  triggerJob.value = row
+  triggerVisible.value = true
 }
 
 function openCreate() {
@@ -231,5 +252,6 @@ onMounted(() => {
 
 <style scoped>
 .name { font-weight: 600; }
+.placeholder { color: var(--jc-text-muted); font-size: 12px; }
 .pager { display: flex; justify-content: flex-end; padding: 14px 4px 4px; }
 </style>

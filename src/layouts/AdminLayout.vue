@@ -70,12 +70,15 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   Clock,
+  Cpu,
   Expand,
   Fold,
   Grid,
   Key,
+  List,
   OfficeBuilding,
   Setting,
+  Ticket,
 } from '@element-plus/icons-vue'
 import { healthApi } from '@/api'
 import { useCrumbsStore } from '@/stores/crumbs'
@@ -89,9 +92,12 @@ const collapsed = ref(false)
 
 const navGroups = [
   {
-    title: '平台',
+    title: '调度中心',
     items: [
       { to: '/', label: '概览', icon: Grid },
+      { to: '/jobs', label: '任务管理', icon: List },
+      { to: '/executions', label: '执行记录', icon: Ticket },
+      { to: '/instances', label: '实例', icon: Cpu },
       { to: '/services', label: '服务', icon: OfficeBuilding },
     ],
   },
@@ -114,6 +120,15 @@ const breadcrumbs = computed(() => crumbs.value)
 
 function isActive(to: string): boolean {
   if (to === '/') return route.path === '/'
+  if (to === '/jobs') return route.path === '/jobs' || Boolean(route.params.jobId)
+  if (to === '/instances') return route.path === '/instances' || Boolean(route.params.instanceId)
+  if (to === '/executions') {
+    return route.path === '/executions' || Boolean(route.params.executionId)
+  }
+  if (to === '/services') {
+    if (route.params.jobId || route.params.instanceId || route.params.executionId) return false
+    return route.path === '/services' || route.path.startsWith('/services/')
+  }
   return route.path === to || route.path.startsWith(`${to}/`)
 }
 
@@ -173,6 +188,18 @@ function syncCrumbs() {
   const instanceName = crumbsStore.instanceTitle || '实例'
   if (path === '/') {
     crumbs.value = [{ title: '概览' }]
+    return
+  }
+  if (path === '/jobs') {
+    crumbs.value = [{ title: '任务管理' }]
+    return
+  }
+  if (path === '/instances') {
+    crumbs.value = [{ title: '实例' }]
+    return
+  }
+  if (path === '/executions') {
+    crumbs.value = [{ title: '执行记录' }]
     return
   }
   if (path === '/services') {
