@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
-import { instancesApi, jobsApi, schedulesApi, servicesApi } from '@/api'
+import { instancesApi, jobsApi, servicesApi } from '@/api'
 import type { InstanceView, JobView, ScheduleView, Service, ServiceDetail } from '@/api/types'
 
 export interface ClusterJob {
@@ -16,16 +16,6 @@ export interface ClusterInstance {
 }
 
 const LIST_LIMIT = 100
-const SCHEDULE_CONCURRENCY = 8
-
-async function mapPool<T, R>(items: T[], size: number, fn: (item: T) => Promise<R>): Promise<R[]> {
-  const out: R[] = []
-  for (let i = 0; i < items.length; i += size) {
-    const chunk = items.slice(i, i + size)
-    out.push(...(await Promise.all(chunk.map(fn))))
-  }
-  return out
-}
 
 export const useClusterStore = defineStore('cluster', () => {
   const loading = ref(false)
@@ -75,63 +65,80 @@ export const useClusterStore = defineStore('cluster', () => {
     instanceScopeMissing.value = false
     truncated.value = false
     try {
-      const list = await servicesApi.list({ page: 1, limit: LIST_LIMIT })
-      if (list.total > list.list.length) truncated.value = true
+      const svcRes = await servicesApi.list({ page: 1, limit: LIST_LIMIT })
+      if (svcRes.total > svcRes.list.length) truncated.value = true
+      services.value = svcRes.list
 
-      const details = await Promise.all(
-        list.list.map(async (svc) => {
-          try {
-            return await servicesApi.get(svc.id)
-          } catch {
-            return { ...svc, job_count: 0, instance_count: 0, credential_count: 0 } as ServiceDetail
-          }
-        }),
-      )
-      services.value = details
-
-      const jobPages = await Promise.all(
-        details.map(async (svc) => {
-          try {
-            const res = await jobsApi.list(svc.id, { page: 1, limit: LIST_LIMIT })
-            if (res.total > res.list.length) truncated.value = true
-            return { svc, jobs: res.list }
-          } catch {
-            return { svc, jobs: [] as JobView[] }
-          }
-        }),
-      )
-
-      const instPages = await Promise.all(
-        details.map(async (svc) => {
-          try {
-            const res = await instancesApi.list(svc.id, { page: 1, limit: LIST_LIMIT })
-            if (res.total > res.list.length) truncated.value = true
-            return { svc, instances: res.list, forbidden: false }
-          } catch (err) {
-            const message = err instanceof Error ? err.message : String(err)
-            if (message.includes('job.instance.view') || message.includes('403')) {
-              instanceScopeMissing.value = true
-            }
-            return { svc, instances: [] as InstanceView[], forbidden: true }
-          }
-        }),
-      )
-      instances.value = instPages.flatMap((page) =>
-        page.instances.map((instance) => ({ instance, service: page.svc })),
-      )
-
-      const flatJobs = jobPages.flatMap((page) =>
-        page.jobs.map((job) => ({ job, service: page.svc })),
-      )
-      const withSchedules = await mapPool(flatJobs, SCHEDULE_CONCURRENCY, async (item) => {
-        try {
-          const res = await schedulesApi.list(item.service.id, item.job.id, { page: 1, limit: 50 })
-          return { ...item, schedules: res.list }
-        } catch {
-          return { ...item, schedules: [] as ScheduleView[] }
-        }
+      const jobRes = await jobsApi.listGlobal({ page: 1, limit: LIST_LIMIT })
+      if (jobRes.total > jobRes.list.length) truncated.value = true
+      jobs.value = jobRes.list.map((job) => {
+        const service =
+          services.value.find((s) => s.id === job.service_id) ||
+          ({
+            id: job.service_id,
+            code: job.service_code || '',
+            name: job.service_name || job.service_id,
+            status: 'ACTIVE',
+            created_at: '',
+            updated_at: '',
+          } as Service)
+        const schedules = (job.schedules || []).map(
+          (s) =>
+            ({
+              id: s.id,
+              job_id: job.id,
+              code: s.code,
+              name: s.name,
+              enabled: s.enabled,
+              manual_enabled: true,
+              cron_expression: s.cron_expression,
+              timezone: s.timezone || 'UTC',
+              timeout_seconds: 0,
+              max_retries: 0,
+              retry_backoff: {},
+              concurrency_policy: 'ALLOW',
+              concurrency_scope: 'JOB',
+              max_concurrency: 0,
+              queue_max: 0,
+              misfire_policy: 'SKIP',
+              misfire_threshold_seconds: 0,
+              catch_up_max: 0,
+              dispatch_strategy: 'LEAST_LOAD',
+              next_fire_at: s.next_fire_at,
+              last_fire_at: s.last_fire_at,
+              config_source: 'ADMIN',
+              version: 0,
+              created_at: '',
+              updated_at: '',
+            }) as ScheduleView,
+        )
+        return { job, service, schedules }
       })
-      jobs.value = withSchedules
+
+      try {
+        const instRes = await instancesApi.listGlobal({ page: 1, limit: LIST_LIMIT })
+        if (instRes.total > instRes.list.length) truncated.value = true
+        instances.value = instRes.list.map((instance) => {
+          const service =
+            services.value.find((s) => s.id === instance.service_id) ||
+            ({
+              id: instance.service_id,
+              code: instance.service_code || '',
+              name: instance.service_name || instance.service_id,
+              status: 'ACTIVE',
+              created_at: '',
+              updated_at: '',
+            } as Service)
+          return { instance, service }
+        })
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err)
+        if (message.includes('job.instance.view') || message.includes('403')) {
+          instanceScopeMissing.value = true
+        }
+        instances.value = []
+      }
+
       loadedAt.value = Date.now()
     } finally {
       loading.value = false

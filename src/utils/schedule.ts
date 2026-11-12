@@ -1,6 +1,8 @@
-import type { ScheduleView } from '@/api/types'
+import type { ScheduleSummary, ScheduleView } from '@/api/types'
 
-export function primarySchedule(schedules: ScheduleView[] | undefined): ScheduleView | undefined {
+type ScheduleLike = ScheduleSummary | ScheduleView
+
+export function primarySchedule(schedules: ScheduleLike[] | undefined): ScheduleLike | undefined {
   if (!schedules?.length) return undefined
   const enabled = schedules.filter((item) => item.enabled)
   const pool = enabled.length ? enabled : schedules
@@ -11,7 +13,7 @@ export function primarySchedule(schedules: ScheduleView[] | undefined): Schedule
   })[0]
 }
 
-export function scheduleSummary(schedules: ScheduleView[] | undefined): string {
+export function scheduleSummary(schedules: ScheduleLike[] | undefined): string {
   if (!schedules?.length) return '无调度'
   const enabled = schedules.filter((item) => item.enabled)
   if (!enabled.length) {

@@ -3,8 +3,8 @@
     <div class="jc-toolbar">
       <el-input v-model="keyword" clearable placeholder="搜索任务" @keyup.enter="reload" @clear="reload" />
       <el-select v-model="status" clearable placeholder="状态" style="width: 140px" @change="reload">
-        <el-option label="ACTIVE" value="ACTIVE" />
-        <el-option label="DISABLED" value="DISABLED" />
+        <el-option label="启用" value="ACTIVE" />
+        <el-option label="停用" value="DISABLED" />
       </el-select>
       <el-select v-model="enabled" clearable placeholder="是否启用" style="width: 140px" @change="reload">
         <el-option label="启用" value="true" />
@@ -31,12 +31,12 @@
         </template>
       </el-table-column>
       <el-table-column label="超时(秒)" width="100" prop="default_timeout_seconds" />
-      <el-table-column label="Handler" min-width="160" show-overflow-tooltip>
+      <el-table-column label="处理器" min-width="160" show-overflow-tooltip>
         <template #default="{ row }">{{ row.handler || '—' }}</template>
       </el-table-column>
       <el-table-column label="最近执行" width="130">
         <template #default>
-          <span class="placeholder" title="需 last_execution_* 或执行列表接口">待接入</span>
+          <span class="placeholder" title="需提供最近执行信息，或接入执行列表接口">待接入</span>
         </template>
       </el-table-column>
       <el-table-column label="更新时间" width="180">

@@ -12,10 +12,12 @@ const LABELS: Record<string, StatusMeta> = {
   EXPIRED: { label: '已过期', tone: 'warning' },
   REGISTERING: { label: '注册中', tone: 'info' },
   ONLINE: { label: '在线', tone: 'success' },
-  SUSPECT: { label: '可疑', tone: 'warning' },
+  SUSPECT: { label: '疑似离线', tone: 'warning' },
   OFFLINE: { label: '离线', tone: 'muted' },
-  DRAINING: { label: '排空中', tone: 'warning' },
+  DRAINING: { label: '正在下线', tone: 'warning' },
   PENDING: { label: '待处理', tone: 'info' },
+  CLAIMED: { label: '已领取', tone: 'primary' },
+  FIRED: { label: '已触发', tone: 'success' },
   QUEUED: { label: '排队中', tone: 'info' },
   DISPATCHING: { label: '派发中', tone: 'primary' },
   RUNNING: { label: '运行中', tone: 'primary' },
@@ -36,10 +38,29 @@ const LABELS: Record<string, StatusMeta> = {
   FALSE: { label: '否', tone: 'muted' },
 }
 
+/** 调度循环 phase（与任务/实例状态共用词时单独映射，避免冲掉全局标签）。 */
+const SCHEDULER_PHASES: Record<string, StatusMeta> = {
+  RUNNING: { label: '执行中', tone: 'success' },
+  SLEEPING: { label: '休眠', tone: 'info' },
+  IDLE: { label: '空闲', tone: 'muted' },
+  DISABLED: { label: '未启用', tone: 'warning' },
+  STOPPED: { label: '已停止', tone: 'danger' },
+}
+
 export function statusMeta(status?: string | null): StatusMeta {
   if (!status) return { label: '—', tone: 'muted' }
   const key = status.toUpperCase()
   return LABELS[key] ?? { label: status, tone: 'info' }
+}
+
+export function schedulerPhaseMeta(phase?: string | null): StatusMeta {
+  if (!phase) return { label: '—', tone: 'muted' }
+  const key = phase.toUpperCase()
+  return SCHEDULER_PHASES[key] ?? { label: phase, tone: 'info' }
+}
+
+export function statusLabel(status?: string | null): string {
+  return statusMeta(status).label
 }
 
 export function isFinalExecution(status?: string | null): boolean {

@@ -47,7 +47,7 @@ export async function request<T>(method: string, path: string, options: RequestO
 
   if (sign) {
     if (!settings.hasCredentials) {
-      throw new ApiError('请先在「连接设置」中填写 Client ID 与 Client Secret', 40100, 401)
+      throw new ApiError('请先在「连接设置」中填写客户端 ID 与密钥', 40100, 401)
     }
     const s = settings.settings
     const timestamp = String(Math.floor(Date.now() / 1000))
@@ -81,7 +81,7 @@ export async function request<T>(method: string, path: string, options: RequestO
       body: hasBody ? bodyText : undefined,
     })
   } catch {
-    throw new ApiError('无法连接 Job Center，请检查地址或 Vite 代理目标', 0, 0)
+    throw new ApiError('无法连接任务中心，请检查地址或 Vite 代理目标', 0, 0)
   }
 
   const rawText = await response.text()
@@ -114,7 +114,7 @@ export async function requestHealth<T>(path: string): Promise<T> {
   try {
     response = await fetch(url, { method: 'GET', headers: { Accept: 'application/json' } })
   } catch {
-    throw new ApiError('无法连接 Job Center，请检查地址或 Vite 代理目标', 0, 0)
+    throw new ApiError('无法连接任务中心，请检查地址或 Vite 代理目标', 0, 0)
   }
   const rawText = await response.text()
   let payload: unknown = null

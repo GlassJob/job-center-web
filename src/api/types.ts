@@ -25,6 +25,7 @@ export interface Service {
 export interface ServiceDetail extends Service {
   job_count: number
   instance_count: number
+  online_instance_count?: number
   credential_count: number
 }
 
@@ -45,9 +46,22 @@ export interface DeleteServiceResult {
   service?: Service
 }
 
+export interface ScheduleSummary {
+  id: string
+  code: string
+  name: string
+  enabled: boolean
+  cron_expression?: string
+  timezone?: string
+  next_fire_at?: string | null
+  last_fire_at?: string | null
+}
+
 export interface JobView {
   id: string
   service_id: string
+  service_code?: string
+  service_name?: string
   code: string
   name: string
   description?: string
@@ -71,6 +85,10 @@ export interface JobView {
   last_registered_at?: string | null
   created_at: string
   updated_at: string
+  schedules?: ScheduleSummary[]
+  last_execution_id?: string | null
+  last_execution_status?: string
+  last_execution_at?: string | null
 }
 
 export interface CreateJobInput {
@@ -287,13 +305,24 @@ export interface AttemptView {
   result?: unknown
   error_code?: string
   error_message?: string
+  log_info_collected?: number
+  log_warn_collected?: number
+  log_error_collected?: number
+  log_info_dropped?: number
+  log_warn_dropped?: number
+  log_error_dropped?: number
+  log_warn_count?: number
+  log_error_count?: number
 }
 
 export interface ExecutionView {
   id: string
   service_id: string
+  service_code?: string
+  service_name?: string
   job_id: string
   job_code: string
+  job_name?: string
   trigger_type: string
   triggered_by: string
   params?: unknown
@@ -317,6 +346,125 @@ export interface ExecutionView {
   attempt?: AttemptView | null
 }
 
+export interface ExecutionLogView {
+  id: number
+  attempt_id: string
+  sequence: number
+  level: string
+  stream?: string
+  message: string
+  fields?: unknown
+  truncated?: boolean
+  logged_at: string
+  created_at: string
+}
+
+export interface OverviewInstanceCounts {
+  REGISTERING: number
+  ONLINE: number
+  SUSPECT: number
+  OFFLINE: number
+  DRAINING: number
+}
+
+export interface OverviewExecutionToday {
+  total: number
+  running: number
+  success: number
+  failed: number
+  canceled: number
+}
+
+export interface OverviewUpcomingItem {
+  schedule_id: string
+  schedule_code: string
+  schedule_name: string
+  cron_expression?: string
+  timezone?: string
+  next_fire_at?: string | null
+  job_id: string
+  job_code: string
+  job_name: string
+  service_id: string
+  service_code: string
+  service_name: string
+}
+
+export interface OverviewFailedItem {
+  execution_id: string
+  status: string
+  error_code?: string
+  error_message?: string
+  finished_at?: string | null
+  job_id: string
+  job_code: string
+  job_name: string
+  service_id: string
+  service_code: string
+  service_name: string
+}
+
+export interface Overview {
+  service_count: number
+  job_count: number
+  enabled_job_count: number
+  instance_counts: OverviewInstanceCounts
+  execution_today: OverviewExecutionToday
+  upcoming: OverviewUpcomingItem[]
+  recent_failed: OverviewFailedItem[]
+}
+
+export interface SchedulerLoopStatus {
+  phase: string
+  detail?: string
+  updated_at: string
+  last_started_at?: string | null
+  last_finished_at?: string | null
+  last_result?: string
+}
+
+export interface SchedulerStatus {
+  enabled: boolean
+  node_id: string
+  claim: SchedulerLoopStatus
+  generate: SchedulerLoopStatus
+  queued: SchedulerLoopStatus
+}
+
+export interface ScheduleTriggerView {
+  id: string
+  schedule_id: string
+  schedule_code?: string
+  schedule_name?: string
+  job_id: string
+  job_code?: string
+  job_name?: string
+  service_id?: string
+  service_code?: string
+  service_name?: string
+  fire_at: string
+  status: string
+  claimed_by?: string
+  claimed_at?: string | null
+  claim_until?: string | null
+  execution_id?: string | null
+  skip_reason?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface RegenerateScheduleResult {
+  schedule_id: string
+  ok: boolean
+}
+
+export interface RegenerateAllResult {
+  total: number
+  succeeded: number
+  failed: number
+  errors: { schedule_id: string; message: string }[]
+}
+
 export interface InstanceJobView {
   job_id: string
   job_code: string
@@ -328,6 +476,8 @@ export interface InstanceJobView {
 export interface InstanceView {
   id: string
   service_id: string
+  service_code?: string
+  service_name?: string
   instance_key: string
   session_id?: string
   session_epoch: number
@@ -434,6 +584,9 @@ export interface PageQuery {
   limit?: number
   status?: string
   enabled?: string
+  service_id?: string
+  job_id?: string
+  instance_id?: string
   client_id?: string
   operator_id?: string
   action?: string
@@ -442,7 +595,12 @@ export interface PageQuery {
   result?: string
   created_from?: string
   created_to?: string
+  schedule_id?: string
+  fire_from?: string
+  fire_to?: string
   hard?: boolean
+  after?: number | string
+  attempt_id?: string
 }
 
 export const CLIENT_SCOPE_OPTIONS = [

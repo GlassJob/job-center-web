@@ -31,6 +31,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '执行记录', breadcrumb: [{ title: '执行记录' }] },
       },
       {
+        path: 'triggers',
+        name: 'triggers',
+        component: () => import('@/views/TriggersView.vue'),
+        meta: { title: '调度触点', breadcrumb: [{ title: '调度触点' }] },
+      },
+      {
         path: 'services',
         name: 'services',
         component: () => import('@/views/ServicesView.vue'),
@@ -89,8 +95,8 @@ const router = createRouter({
 })
 
 router.afterEach((to) => {
-  const title = (to.meta.title as string | undefined) || 'Job Center'
-  document.title = `${title} · Job Center`
+  const title = (to.meta.title as string | undefined) || '任务中心'
+  document.title = `${title} · 任务中心`
 })
 
 export default router

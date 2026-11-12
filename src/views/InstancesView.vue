@@ -9,7 +9,7 @@
       type="warning"
       show-icon
       :closable="false"
-      title="当前客户端缺少 job.instance.view 权限，实例列表可能不完整。请在「客户端」中勾选「实例查看」。"
+      title="当前客户端缺少「实例查看」权限，实例列表可能不完整。请在「客户端」中勾选该权限。"
       style="border-radius: 10px"
     />
 
@@ -36,7 +36,7 @@
           style="width: 240px"
         />
         <el-select v-model="status" clearable placeholder="状态" style="width: 150px">
-          <el-option v-for="item in INSTANCE_STATUSES" :key="item" :label="item" :value="item" />
+          <el-option v-for="item in INSTANCE_STATUSES" :key="item" :label="statusLabel(item)" :value="item" />
         </el-select>
         <span class="jc-toolbar-spacer" />
         <span class="jc-muted">在线 {{ onlineCount }} / 共 {{ filtered.length }}</span>
@@ -101,6 +101,7 @@ import { INSTANCE_STATUSES } from '@/api/types'
 import type { ClusterInstance } from '@/stores/cluster'
 import { useClusterStore } from '@/stores/cluster'
 import { formatTime } from '@/utils/time'
+import { statusLabel } from '@/utils/status'
 import PageHeader from '@/components/PageHeader.vue'
 import StatusTag from '@/components/StatusTag.vue'
 

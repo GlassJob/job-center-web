@@ -1,17 +1,17 @@
 <template>
   <div>
     <div class="jc-toolbar">
-      <el-input v-model="keyword" clearable placeholder="搜索 key" @keyup.enter="reload" @clear="reload" />
+      <el-input v-model="keyword" clearable placeholder="搜索键名" @keyup.enter="reload" @clear="reload" />
       <el-button @click="reload">查询</el-button>
       <span class="jc-toolbar-spacer" />
       <el-button type="primary" @click="openCreate">新建游标</el-button>
     </div>
 
     <el-table v-loading="loading" :data="list" @row-click="openEdit">
-      <el-table-column label="Key" min-width="160">
+      <el-table-column label="键" min-width="160">
         <template #default="{ row }"><span class="jc-code">{{ row.key }}</span></template>
       </el-table-column>
-      <el-table-column label="Version" width="100" prop="version" />
+      <el-table-column label="版本" width="100" prop="version" />
       <el-table-column label="更新者" min-width="160">
         <template #default="{ row }">{{ row.updated_by || '—' }}</template>
       </el-table-column>
@@ -50,11 +50,11 @@
 
     <el-dialog v-model="visible" :title="editing ? `编辑游标 · ${editing.key} · v${editing.version}` : '新建游标'" width="640px">
       <el-form label-width="88px">
-        <el-form-item v-if="!editing" label="Key" required>
+        <el-form-item v-if="!editing" label="键" required>
           <el-input v-model="form.key" placeholder="例如 cursor" />
         </el-form-item>
-        <el-form-item label="Value">
-          <JsonEditor ref="valueEditor" v-model="form.valueText" label="state.value" />
+        <el-form-item label="值">
+          <JsonEditor ref="valueEditor" v-model="form.valueText" label="游标值" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -134,11 +134,11 @@ async function onSubmit() {
     return
   }
   if (!value) {
-    ElMessage.warning('Value 必须是 JSON 对象')
+    ElMessage.warning('值必须是 JSON 对象')
     return
   }
   if (!editing.value && !form.key.trim()) {
-    ElMessage.warning('请填写 Key')
+    ElMessage.warning('请填写键名')
     return
   }
   saving.value = true

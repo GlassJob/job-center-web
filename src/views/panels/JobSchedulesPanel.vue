@@ -38,9 +38,18 @@
       <el-table-column label="上次触发" width="180">
         <template #default="{ row }">{{ formatTime(row.last_fire_at) }}</template>
       </el-table-column>
-      <el-table-column label="操作" width="160" fixed="right">
+      <el-table-column label="操作" width="240" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" @click.stop="openEdit(row)">编辑</el-button>
+          <el-button link type="primary" @click.stop="goTriggers(row)">触点</el-button>
+          <el-button
+            link
+            type="warning"
+            :loading="regenId === row.id"
+            @click.stop="onRegenerate(row)"
+          >
+            重生
+          </el-button>
           <el-button link type="danger" @click.stop="onDelete(row)">删除</el-button>
         </template>
       </el-table-column>
@@ -74,7 +83,7 @@
         </el-form-item>
         <el-form-item label="Cron 表达式">
           <el-input v-model="form.cron_expression" placeholder="例如 0 */5 * * * *" />
-          <el-checkbox v-if="editing" v-model="form.clearCron">清除 Cron</el-checkbox>
+          <el-checkbox v-if="editing" v-model="form.clearCron">清除 Cron 表达式</el-checkbox>
         </el-form-item>
         <el-form-item label="时区">
           <el-input v-model="form.timezone" placeholder="Asia/Shanghai" />
@@ -87,12 +96,12 @@
         </el-form-item>
         <el-form-item label="并发策略">
           <el-select v-model="form.concurrency_policy" clearable style="width: 220px">
-            <el-option v-for="item in CONCURRENCY_POLICIES" :key="item" :label="item" :value="item" />
+            <el-option v-for="item in CONCURRENCY_POLICIES" :key="item" :label="enumLabel(item, CONCURRENCY_POLICY_LABELS)" :value="item" />
           </el-select>
         </el-form-item>
         <el-form-item label="并发范围">
           <el-select v-model="form.concurrency_scope" clearable style="width: 220px">
-            <el-option v-for="item in CONCURRENCY_SCOPES" :key="item" :label="item" :value="item" />
+            <el-option v-for="item in CONCURRENCY_SCOPES" :key="item" :label="enumLabel(item, CONCURRENCY_SCOPE_LABELS)" :value="item" />
           </el-select>
         </el-form-item>
         <el-form-item label="最大并发 / 队列">
@@ -100,28 +109,28 @@
           <span class="inline-gap" />
           <el-input-number v-model="form.queue_max" :min="0" :controls="false" />
         </el-form-item>
-        <el-form-item label="Misfire 策略">
+        <el-form-item label="错过触发策略">
           <el-select v-model="form.misfire_policy" clearable style="width: 220px">
-            <el-option v-for="item in MISFIRE_POLICIES" :key="item" :label="item" :value="item" />
+            <el-option v-for="item in MISFIRE_POLICIES" :key="item" :label="enumLabel(item, MISFIRE_POLICY_LABELS)" :value="item" />
           </el-select>
         </el-form-item>
-        <el-form-item label="Misfire 阈值(秒)">
+        <el-form-item label="错过触发阈值(秒)">
           <el-input-number v-model="form.misfire_threshold_seconds" :min="0" :controls="false" />
         </el-form-item>
-        <el-form-item label="Catch-up 上限">
+        <el-form-item label="追赶上限">
           <el-input-number v-model="form.catch_up_max" :min="0" :controls="false" />
         </el-form-item>
         <el-form-item label="派发策略">
           <el-select v-model="form.dispatch_strategy" clearable style="width: 220px">
-            <el-option v-for="item in DISPATCH_STRATEGIES" :key="item" :label="item" :value="item" />
+            <el-option v-for="item in DISPATCH_STRATEGIES" :key="item" :label="enumLabel(item, DISPATCH_STRATEGY_LABELS)" :value="item" />
           </el-select>
         </el-form-item>
         <el-form-item label="默认参数">
-          <JsonEditor ref="paramsEditor" v-model="form.defaultParamsText" clearable empty-as="null" label="default_params" />
-          <el-checkbox v-if="editing" v-model="form.clearParams">清空默认参数（null）</el-checkbox>
+          <JsonEditor ref="paramsEditor" v-model="form.defaultParamsText" clearable empty-as="null" label="默认参数" />
+          <el-checkbox v-if="editing" v-model="form.clearParams">清空默认参数</el-checkbox>
         </el-form-item>
         <el-form-item label="重试退避">
-          <JsonEditor ref="backoffEditor" v-model="form.retryBackoffText" clearable empty-as="null" label="retry_backoff" />
+          <JsonEditor ref="backoffEditor" v-model="form.retryBackoffText" clearable empty-as="null" label="重试退避" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -134,7 +143,8 @@
 
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { useRouter } from 'vue-router'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { schedulesApi } from '@/api'
 import {
   CONCURRENCY_POLICIES,
@@ -146,13 +156,22 @@ import {
   type ScheduleView,
 } from '@/api/types'
 import { confirmDelete, handleConflict, toastError } from '@/utils/feedback'
+import {
+  CONCURRENCY_POLICY_LABELS,
+  CONCURRENCY_SCOPE_LABELS,
+  DISPATCH_STRATEGY_LABELS,
+  MISFIRE_POLICY_LABELS,
+  enumLabel,
+} from '@/utils/labels'
 import { prettyJson } from '@/utils/json'
 import { formatTime } from '@/utils/time'
 import JsonEditor from '@/components/JsonEditor.vue'
 
 const props = defineProps<{ serviceId: string; jobId: string }>()
+const router = useRouter()
 const loading = ref(false)
 const saving = ref(false)
+const regenId = ref('')
 const list = ref<ScheduleView[]>([])
 const total = ref(0)
 const page = ref(1)
@@ -208,6 +227,35 @@ async function fetchList() {
 function reload() {
   page.value = 1
   void fetchList()
+}
+
+function goTriggers(row: ScheduleView) {
+  void router.push({
+    path: '/triggers',
+    query: { schedule_id: row.id, service_id: props.serviceId },
+  })
+}
+
+async function onRegenerate(row: ScheduleView) {
+  try {
+    await ElMessageBox.confirm(
+      `重生排班「${row.name}」的未来触点（先删再插）？`,
+      '单排班重生',
+      { type: 'warning', confirmButtonText: '重生', cancelButtonText: '取消' },
+    )
+  } catch {
+    return
+  }
+  regenId.value = row.id
+  try {
+    await schedulesApi.regenerate(props.serviceId, props.jobId, row.id)
+    ElMessage.success('已重生触点')
+    await fetchList()
+  } catch (err) {
+    toastError(err, '重生失败')
+  } finally {
+    regenId.value = ''
+  }
 }
 
 function resetForm() {

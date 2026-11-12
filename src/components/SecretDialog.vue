@@ -23,18 +23,18 @@
     </div>
     <div v-if="secret" class="block">
       <div class="block-head">
-        <strong>Secret</strong>
+        <strong>密钥</strong>
         <el-button type="primary" link @click="copy(secret)">复制</el-button>
       </div>
       <pre class="json-pre">{{ secret }}</pre>
     </div>
     <div v-if="token" class="block">
       <div class="block-head">
-        <strong>Token</strong>
+        <strong>令牌</strong>
         <el-button type="primary" link @click="copy(token)">复制</el-button>
       </div>
       <pre class="json-pre">{{ token }}</pre>
-      <p class="hint">Token 格式为 jcs_&lt;id&gt;.&lt;secret&gt;，用于 HTTP 联调；WebSocket 请使用 HMAC。</p>
+      <p class="hint">令牌格式为 jcs_&lt;id&gt;.&lt;secret&gt;，用于 HTTP 联调；WebSocket 请使用 HMAC。</p>
     </div>
     <template #footer>
       <el-button type="primary" @click="visible = false">我已保存，关闭</el-button>

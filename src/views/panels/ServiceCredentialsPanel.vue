@@ -3,8 +3,8 @@
     <div class="jc-toolbar">
       <el-input v-model="keyword" clearable placeholder="搜索凭据" @keyup.enter="reload" @clear="reload" />
       <el-select v-model="status" clearable placeholder="状态" style="width: 140px" @change="reload">
-        <el-option label="ACTIVE" value="ACTIVE" />
-        <el-option label="REVOKED" value="REVOKED" />
+        <el-option label="启用" value="ACTIVE" />
+        <el-option label="已吊销" value="REVOKED" />
       </el-select>
       <el-button @click="reload">查询</el-button>
       <span class="jc-toolbar-spacer" />
@@ -16,7 +16,7 @@
       <el-table-column label="状态" width="110">
         <template #default="{ row }"><StatusTag :status="row.status" /></template>
       </el-table-column>
-      <el-table-column label="Secret 提示" min-width="120">
+      <el-table-column label="密钥提示" min-width="120">
         <template #default="{ row }"><span class="jc-code">{{ row.secret_hint || '—' }}</span></template>
       </el-table-column>
       <el-table-column label="过期时间" width="180">

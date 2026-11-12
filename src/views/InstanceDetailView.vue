@@ -18,7 +18,7 @@
           <dl class="jc-kv">
             <dt>实例 ID</dt>
             <dd class="jc-code">{{ instance.id }}</dd>
-            <dt>Instance Key</dt>
+            <dt>实例标识</dt>
             <dd class="jc-code">{{ instance.instance_key || '—' }}</dd>
             <dt>会话</dt>
             <dd>
@@ -49,7 +49,7 @@
             <dd>{{ instance.sdk_version || '—' }} / {{ instance.protocol_version || '—' }}</dd>
             <dt>应用版本</dt>
             <dd>{{ instance.app_version || '—' }}</dd>
-            <dt>Git Commit</dt>
+            <dt>Git 提交</dt>
             <dd class="jc-code">{{ instance.git_commit || '—' }}</dd>
             <dt>构建时间</dt>
             <dd>{{ formatTimeTzLabel(instance.build_time) }}</dd>
@@ -74,10 +74,10 @@
               <span class="clickable-id">{{ row.job_code }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="Job ID" min-width="220">
+          <el-table-column label="任务 ID" min-width="220">
             <template #default="{ row }"><span class="jc-code">{{ row.job_id }}</span></template>
           </el-table-column>
-          <el-table-column label="Handler 版本" min-width="160" prop="handler_version" />
+          <el-table-column label="处理器版本" min-width="160" prop="handler_version" />
           <el-table-column label="最大并发" width="120">
             <template #default="{ row }">{{ row.max_concurrency ?? '—' }}</template>
           </el-table-column>
@@ -88,7 +88,7 @@
       </div>
 
       <div class="jc-card info">
-        <h3 class="jc-section-title">Metadata</h3>
+        <h3 class="jc-section-title">元数据</h3>
         <pre class="json">{{ pretty(instance.metadata) }}</pre>
       </div>
     </template>

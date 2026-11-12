@@ -4,7 +4,7 @@
       <el-input
         v-model="keyword"
         clearable
-        placeholder="搜索 ID / instance_key / 主机名 / IP"
+        placeholder="搜索 ID、实例标识、主机名或 IP"
         @keyup.enter="reload"
         @clear="reload"
       />

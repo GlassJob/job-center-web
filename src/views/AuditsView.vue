@@ -4,15 +4,15 @@
 
     <div class="jc-card table-card">
       <div class="jc-toolbar filters">
-        <el-input v-model="filters.client_id" clearable placeholder="Client ID" style="width: 180px" />
-        <el-input v-model="filters.operator_id" clearable placeholder="Operator ID" style="width: 160px" />
-        <el-input v-model="filters.action" clearable placeholder="Action" style="width: 160px" />
+        <el-input v-model="filters.client_id" clearable placeholder="客户端 ID" style="width: 180px" />
+        <el-input v-model="filters.operator_id" clearable placeholder="操作者 ID" style="width: 160px" />
+        <el-input v-model="filters.action" clearable placeholder="动作" style="width: 160px" />
         <el-input v-model="filters.resource_type" clearable placeholder="资源类型" style="width: 140px" />
         <el-input v-model="filters.resource_id" clearable placeholder="资源 ID" style="width: 180px" />
         <el-select v-model="filters.result" clearable placeholder="结果" style="width: 120px">
-          <el-option label="OK" value="OK" />
-          <el-option label="ERROR" value="ERROR" />
-          <el-option label="DENIED" value="DENIED" />
+          <el-option label="成功" value="OK" />
+          <el-option label="失败" value="ERROR" />
+          <el-option label="拒绝" value="DENIED" />
         </el-select>
         <el-date-picker
           v-model="dateRange"
@@ -38,7 +38,7 @@
         <el-table-column label="动作" min-width="160" prop="action" />
         <el-table-column label="资源" min-width="200">
           <template #default="{ row }">
-            <div>{{ row.resource_type }}</div>
+            <div>{{ resourceTypeLabel(row.resource_type) }}</div>
             <div class="jc-code">{{ row.resource_id || '—' }}</div>
           </template>
         </el-table-column>
@@ -46,7 +46,7 @@
           <template #default="{ row }"><StatusTag :status="row.result" /></template>
         </el-table-column>
         <el-table-column label="权限" min-width="140" show-overflow-tooltip>
-          <template #default="{ row }">{{ row.permission || '—' }}</template>
+          <template #default="{ row }">{{ scopeLabel(row.permission) }}</template>
         </el-table-column>
       </el-table>
       <div class="pager">
@@ -70,28 +70,28 @@
           <dd>{{ current.id }}</dd>
           <dt>时间</dt>
           <dd>{{ formatTimeTzLabel(current.created_at) }}</dd>
-          <dt>Client</dt>
+          <dt>客户端</dt>
           <dd class="jc-code">{{ current.client_id }}</dd>
           <dt>操作者</dt>
           <dd>{{ current.operator_name || '—' }} / {{ current.operator_id || '—' }}</dd>
           <dt>动作</dt>
           <dd>{{ current.action }}</dd>
           <dt>权限</dt>
-          <dd>{{ current.permission || '—' }}</dd>
+          <dd>{{ scopeLabel(current.permission) }}</dd>
           <dt>资源</dt>
-          <dd>{{ current.resource_type }} / <span class="jc-code">{{ current.resource_id || '—' }}</span></dd>
+          <dd>{{ resourceTypeLabel(current.resource_type) }} / <span class="jc-code">{{ current.resource_id || '—' }}</span></dd>
           <dt>结果</dt>
           <dd><StatusTag :status="current.result" /></dd>
           <dt>错误</dt>
           <dd>{{ current.error_message || '—' }}</dd>
-          <dt>Request / Trace</dt>
+          <dt>请求 / 追踪</dt>
           <dd class="jc-code">{{ current.request_id || '—' }} / {{ current.trace_id || '—' }}</dd>
           <dt>IP</dt>
           <dd>{{ current.client_ip || '—' }}</dd>
         </dl>
-        <h4>Before</h4>
+        <h4>变更前</h4>
         <pre class="json-pre">{{ prettyJson(current.before_data) || '—' }}</pre>
-        <h4>After</h4>
+        <h4>变更后</h4>
         <pre class="json-pre">{{ prettyJson(current.after_data) || '—' }}</pre>
       </template>
     </el-drawer>
@@ -105,6 +105,7 @@ import type { OperationAuditView } from '@/api/types'
 import { toastError } from '@/utils/feedback'
 import { prettyJson } from '@/utils/json'
 import { formatTime, formatTimeTzLabel, toRfc3339Utc } from '@/utils/time'
+import { resourceTypeLabel, scopeLabel } from '@/utils/labels'
 import PageHeader from '@/components/PageHeader.vue'
 import StatusTag from '@/components/StatusTag.vue'
 

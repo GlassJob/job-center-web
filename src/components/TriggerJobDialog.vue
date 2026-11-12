@@ -12,7 +12,7 @@
           v-model="prefillId"
           clearable
           filterable
-          placeholder="选择调度以预填 default_params"
+          placeholder="选择调度以预填默认参数"
           style="width: 100%"
           @change="applyPrefill"
         >
@@ -24,11 +24,11 @@
           />
         </el-select>
       </el-form-item>
-      <el-form-item label="params">
-        <JsonEditor ref="paramsEditor" v-model="paramsText" label="params" />
+      <el-form-item label="参数">
+        <JsonEditor ref="paramsEditor" v-model="paramsText" label="参数" />
       </el-form-item>
       <el-form-item label="幂等键">
-        <el-input v-model="idempotencyKey" placeholder="可选 idempotency_key" />
+        <el-input v-model="idempotencyKey" placeholder="可选，幂等键" />
       </el-form-item>
       <el-form-item label="指定实例">
         <el-select

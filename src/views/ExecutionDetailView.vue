@@ -21,7 +21,7 @@
         <div class="jc-card info">
           <h3 class="jc-section-title">执行信息</h3>
           <dl class="jc-kv">
-            <dt>Execution ID</dt>
+            <dt>执行 ID</dt>
             <dd class="jc-code">{{ execution.id }}</dd>
             <dt>任务</dt>
             <dd>
@@ -33,14 +33,14 @@
               <span v-if="execution.status_reason" class="jc-secondary"> · {{ execution.status_reason }}</span>
             </dd>
             <dt>触发</dt>
-            <dd>{{ execution.trigger_type }} / {{ execution.triggered_by || '—' }}</dd>
+            <dd>{{ enumLabel(execution.trigger_type, TRIGGER_TYPE_LABELS) }} / {{ execution.triggered_by || '—' }}</dd>
             <dt>尝试</dt>
             <dd>{{ execution.attempt_count }} / {{ execution.max_attempts }}（当前 #{{ execution.current_attempt_no }}）</dd>
-            <dt>当前 Attempt</dt>
+            <dt>当前尝试</dt>
             <dd class="jc-code">{{ execution.current_attempt_id || '—' }}</dd>
             <dt>超时</dt>
             <dd>{{ execution.timeout_seconds }} 秒</dd>
-            <dt>Handler 版本</dt>
+            <dt>处理器版本</dt>
             <dd>{{ execution.handler_version || '—' }}</dd>
             <dt>排队 / 开始 / 结束</dt>
             <dd>
@@ -64,10 +64,10 @@
 
         <div class="stack">
           <div class="jc-card info">
-            <h3 class="jc-section-title">当前 Attempt</h3>
+            <h3 class="jc-section-title">当前尝试</h3>
             <template v-if="execution.attempt">
               <dl class="jc-kv">
-                <dt>Attempt ID</dt>
+                <dt>尝试 ID</dt>
                 <dd class="jc-code">{{ execution.attempt.id }}</dd>
                 <dt>序号</dt>
                 <dd>#{{ execution.attempt.attempt_no }}</dd>
@@ -90,7 +90,7 @@
                   <template v-else>{{ execution.attempt.progress_message || '—' }}</template>
                 </dd>
                 <dt>取消状态</dt>
-                <dd>{{ execution.attempt.cancel_state || '—' }}</dd>
+                <dd>{{ enumLabel(execution.attempt.cancel_state, CANCEL_STATE_LABELS) }}</dd>
                 <dt>租约到期</dt>
                 <dd>{{ formatTime(execution.attempt.lease_expires_at) }}</dd>
                 <dt>派发 / 确认</dt>
@@ -99,21 +99,52 @@
                 <dd>{{ formatTime(execution.attempt.started_at) }} / {{ formatTime(execution.attempt.finished_at) }}</dd>
                 <dt>错误</dt>
                 <dd>{{ execution.attempt.error_code || execution.attempt.error_message || '—' }}</dd>
+                <dt>日志 WARN</dt>
+                <dd>
+                  总量 {{ execution.attempt.log_warn_count ?? 0 }}
+                  （入库 {{ execution.attempt.log_warn_collected ?? 0 }}
+                  · 丢弃 {{ execution.attempt.log_warn_dropped ?? 0 }}）
+                </dd>
+                <dt>日志 ERROR</dt>
+                <dd>
+                  总量 {{ execution.attempt.log_error_count ?? 0 }}
+                  （入库 {{ execution.attempt.log_error_collected ?? 0 }}
+                  · 丢弃 {{ execution.attempt.log_error_dropped ?? 0 }}）
+                </dd>
+                <dt>日志 INFO 入库/丢弃</dt>
+                <dd>
+                  {{ execution.attempt.log_info_collected ?? 0 }}
+                  / {{ execution.attempt.log_info_dropped ?? 0 }}
+                </dd>
               </dl>
             </template>
-            <el-empty v-else description="暂无 attempt 详情" />
+            <el-empty v-else description="暂无尝试详情" />
           </div>
         </div>
       </div>
 
       <div class="grid">
         <div class="jc-card info">
-          <h3 class="jc-section-title">Params</h3>
+          <h3 class="jc-section-title">参数</h3>
           <pre class="json-pre">{{ prettyJson(execution.params) || '—' }}</pre>
         </div>
         <div class="jc-card info">
-          <h3 class="jc-section-title">Result</h3>
+          <h3 class="jc-section-title">结果</h3>
           <pre class="json-pre">{{ prettyJson(execution.result || execution.attempt?.result) || '—' }}</pre>
+        </div>
+      </div>
+
+      <div class="jc-card info logs-card">
+        <div class="logs-head">
+          <h3 class="jc-section-title">执行日志</h3>
+          <el-button link type="primary" :loading="logsLoading" @click="() => loadLogs({ reset: true })">刷新</el-button>
+        </div>
+        <el-empty v-if="!logsLoading && logs.length === 0" description="暂无日志（执行器需上报 task.log）" />
+        <div v-else class="log-stream">
+          <div v-for="item in logs" :key="item.id" class="log-line">
+            <span class="log-meta">#{{ item.sequence }} {{ item.level }}</span>
+            <span class="log-msg">{{ item.message }}</span>
+          </div>
         </div>
       </div>
     </template>
@@ -121,20 +152,23 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { VideoPlay } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { executionsApi, jobsApi, servicesApi } from '@/api'
-import type { ExecutionView } from '@/api/types'
+import type { ExecutionLogView, ExecutionView } from '@/api/types'
 import { handleConflict, toastError } from '@/utils/feedback'
 import { prettyJson } from '@/utils/json'
 import { isFinalExecution } from '@/utils/status'
 import { formatTime, formatTimeTzLabel } from '@/utils/time'
+import { CANCEL_STATE_LABELS, TRIGGER_TYPE_LABELS, enumLabel } from '@/utils/labels'
 import { useCrumbsStore } from '@/stores/crumbs'
 import { useSessionStore } from '@/stores/session'
 import EntityHeader from '@/components/EntityHeader.vue'
 import StatusTag from '@/components/StatusTag.vue'
+
+const LOG_POLL_MS = 2000
 
 const route = useRoute()
 const crumbs = useCrumbsStore()
@@ -142,6 +176,10 @@ const session = useSessionStore()
 const loading = ref(false)
 const cancelling = ref(false)
 const execution = ref<ExecutionView | null>(null)
+const logs = ref<ExecutionLogView[]>([])
+const logsLoading = ref(false)
+const logAfter = ref(0)
+let logPollTimer: ReturnType<typeof setInterval> | null = null
 
 const serviceId = computed(() => route.params.serviceId as string)
 const jobId = computed(() => route.params.jobId as string)
@@ -169,11 +207,68 @@ async function load() {
     }
     execution.value = await executionsApi.get(serviceId.value, jobId.value, executionId.value)
     session.updateExecution(execution.value.id, { status: execution.value.status })
+    await loadLogs({ reset: true })
+    startLogPoll()
   } catch (err) {
     toastError(err, '加载执行失败')
   } finally {
     loading.value = false
   }
+}
+
+async function loadLogs(opts?: { reset?: boolean; silent?: boolean }) {
+  const reset = opts?.reset ?? true
+  const silent = opts?.silent ?? false
+  if (!silent) logsLoading.value = true
+  try {
+    if (reset) {
+      logAfter.value = 0
+      logs.value = []
+    }
+    const res = await executionsApi.logs(serviceId.value, jobId.value, executionId.value, {
+      after: logAfter.value,
+      limit: 200,
+      attempt_id: execution.value?.current_attempt_id || undefined,
+    })
+    if (res.list.length > 0) {
+      logs.value = reset ? res.list : logs.value.concat(res.list)
+      const last = res.list[res.list.length - 1]
+      if (last?.sequence != null) {
+        logAfter.value = last.sequence
+      }
+    }
+  } catch (err) {
+    if (!silent) toastError(err, '加载日志失败')
+  } finally {
+    if (!silent) logsLoading.value = false
+  }
+}
+
+function stopLogPoll() {
+  if (logPollTimer != null) {
+    clearInterval(logPollTimer)
+    logPollTimer = null
+  }
+}
+
+function startLogPoll() {
+  stopLogPoll()
+  if (!execution.value || isFinalExecution(execution.value.status)) return
+  logPollTimer = setInterval(() => {
+    void (async () => {
+      try {
+        const fresh = await executionsApi.get(serviceId.value, jobId.value, executionId.value)
+        execution.value = fresh
+        session.updateExecution(fresh.id, { status: fresh.status })
+        await loadLogs({ reset: false, silent: true })
+        if (isFinalExecution(fresh.status)) {
+          stopLogPoll()
+        }
+      } catch {
+        // 轮询失败静默，保留已有日志
+      }
+    })()
+  }, LOG_POLL_MS)
 }
 
 async function onCancel() {
@@ -202,6 +297,10 @@ async function onCancel() {
 onMounted(() => {
   void load()
 })
+
+onUnmounted(() => {
+  stopLogPoll()
+})
 </script>
 
 <style scoped>
@@ -215,4 +314,25 @@ onMounted(() => {
 }
 .stack { display: flex; flex-direction: column; gap: 16px; }
 .info { padding: 18px 20px; }
+.logs-card { margin-top: 16px; }
+.logs-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.logs-head .jc-section-title { margin: 0; }
+.log-stream {
+  max-height: 360px;
+  overflow: auto;
+  font-family: var(--jc-font-mono, ui-monospace, monospace);
+  font-size: 12px;
+  line-height: 1.55;
+  background: #0f172a0a;
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+.log-line { display: flex; gap: 10px; }
+.log-meta { color: var(--jc-text-muted); white-space: nowrap; }
+.log-msg { white-space: pre-wrap; word-break: break-word; }
 </style>

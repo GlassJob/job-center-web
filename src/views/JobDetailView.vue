@@ -34,14 +34,14 @@
                   <span class="sep">·</span>
                   {{ job.enabled ? '启用' : '停用' }}
                 </dd>
-                <dt>Handler</dt>
+                <dt>处理器</dt>
                 <dd>{{ job.handler || '—' }} {{ job.handler_version ? `@${job.handler_version}` : '' }}</dd>
                 <dt>语言</dt>
                 <dd>{{ job.language || '—' }}</dd>
                 <dt>默认超时</dt>
                 <dd>{{ job.default_timeout_seconds }} 秒</dd>
                 <dt>幂等模式</dt>
-                <dd>{{ job.idempotency_mode || '—' }} / 已验证：{{ job.idempotency_verified ? '是' : '否' }}</dd>
+                <dd>{{ enumLabel(job.idempotency_mode, IDEMPOTENCY_MODE_LABELS) }} / 已验证：{{ job.idempotency_verified ? '是' : '否' }}</dd>
                 <dt>能力</dt>
                 <dd class="caps">
                   <el-tag size="small" :type="job.supports_cancel ? 'primary' : 'info'" effect="plain">取消</el-tag>
@@ -82,7 +82,7 @@
                 <el-button type="primary" plain @click="tab = 'executions'">手动触发 / 按 ID 查看</el-button>
               </div>
               <div class="jc-card info">
-                <h3 class="jc-section-title">参数 Schema</h3>
+                <h3 class="jc-section-title">参数结构</h3>
                 <pre class="json-pre">{{ prettyJson(job.params_schema) || '暂无' }}</pre>
               </div>
             </div>
@@ -151,6 +151,7 @@ import type { JobView, ScheduleView } from '@/api/types'
 import { confirmDelete, toastError } from '@/utils/feedback'
 import { prettyJson } from '@/utils/json'
 import { formatTimeTzLabel } from '@/utils/time'
+import { IDEMPOTENCY_MODE_LABELS, enumLabel } from '@/utils/labels'
 import { useCrumbsStore } from '@/stores/crumbs'
 import EntityHeader from '@/components/EntityHeader.vue'
 import StatusTag from '@/components/StatusTag.vue'

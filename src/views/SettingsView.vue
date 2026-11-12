@@ -1,10 +1,10 @@
 <template>
   <div class="jc-page">
-    <PageHeader title="连接设置" description="配置 Job Center 地址与 HMAC 凭证。密钥仅保存在本机浏览器 localStorage，不会写入仓库。" />
+    <PageHeader title="连接设置" description="配置任务中心地址与 HMAC 凭证。密钥仅保存在本机浏览器，不会写入仓库。" />
 
     <div class="jc-card form-card">
       <el-form label-width="140px" @submit.prevent="onSave">
-        <el-form-item label="Base URL">
+        <el-form-item label="服务地址">
           <el-input
             v-model="conn.baseUrl"
             placeholder="http://127.0.0.1:8080"
@@ -17,10 +17,10 @@
             直接填写后端地址则由浏览器发起跨域请求。
           </div>
         </el-form-item>
-        <el-form-item label="Client ID" required>
+        <el-form-item label="客户端 ID" required>
           <el-input v-model="conn.clientId" placeholder="管理端客户端 ID" clearable />
         </el-form-item>
-        <el-form-item label="Client Secret" required>
+        <el-form-item label="客户端密钥" required>
           <el-input
             v-model="conn.clientSecret"
             type="password"
@@ -29,10 +29,10 @@
             autocomplete="off"
           />
         </el-form-item>
-        <el-form-item label="Operator ID">
+        <el-form-item label="操作者 ID">
           <el-input v-model="conn.operatorId" placeholder="写入审计的操作者 ID" clearable />
         </el-form-item>
-        <el-form-item label="Operator Name">
+        <el-form-item label="操作者名称">
           <el-input v-model="conn.operatorName" placeholder="写入审计的操作者名称" clearable />
         </el-form-item>
         <el-form-item>
@@ -75,7 +75,7 @@ function onSave() {
   saving.value = true
   try {
     settings.save({ ...conn.value })
-    ElMessage.success('已保存到本机 localStorage')
+    ElMessage.success('已保存到本机浏览器')
   } finally {
     saving.value = false
   }

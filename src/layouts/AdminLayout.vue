@@ -1,20 +1,11 @@
 <template>
   <div class="shell" :class="{ collapsed }">
     <aside class="sidebar">
-      <div class="brand" @click="router.push('/')">
+      <div class="brand" @click="router.push('/')" role="link" aria-label="任务中心">
         <div class="logo" aria-hidden="true">
-          <svg viewBox="0 0 32 32" width="28" height="28">
-            <rect width="32" height="32" rx="8" fill="#7147E8" />
-            <path
-              d="M9 11.5h6.2c2.6 0 4.3 1.5 4.3 3.7 0 1.5-.8 2.6-2.1 3.2l2.6 4.1h-2.6l-2.3-3.7h-3.4V22.5H9V11.5Zm2.7 2v3.2h3.3c1.2 0 1.9-.6 1.9-1.6s-.7-1.6-1.9-1.6H11.7Z"
-              fill="#fff"
-            />
-          </svg>
+          <img src="/logo.svg" width="28" height="28" alt="" />
         </div>
-        <div v-show="!collapsed" class="wordmark">
-          <div>Job</div>
-          <div>Center</div>
-        </div>
+        <div v-show="!collapsed" class="wordmark">任务中心</div>
       </div>
 
       <nav class="nav">
@@ -69,6 +60,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
+  AlarmClock,
   Clock,
   Cpu,
   Expand,
@@ -96,6 +88,7 @@ const navGroups = [
     items: [
       { to: '/', label: '概览', icon: Grid },
       { to: '/jobs', label: '任务管理', icon: List },
+      { to: '/triggers', label: '调度触点', icon: AlarmClock },
       { to: '/executions', label: '执行记录', icon: Ticket },
       { to: '/instances', label: '实例', icon: Cpu },
       { to: '/services', label: '服务', icon: OfficeBuilding },
@@ -125,6 +118,7 @@ function isActive(to: string): boolean {
   if (to === '/executions') {
     return route.path === '/executions' || Boolean(route.params.executionId)
   }
+  if (to === '/triggers') return route.path === '/triggers' || route.path.startsWith('/triggers')
   if (to === '/services') {
     if (route.params.jobId || route.params.instanceId || route.params.executionId) return false
     return route.path === '/services' || route.path.startsWith('/services/')
@@ -264,12 +258,25 @@ watch([() => route.fullPath, () => crumbsStore.serviceTitle, () => crumbsStore.j
   cursor: pointer;
   min-height: 64px;
 }
+.collapsed .brand {
+  justify-content: center;
+  padding-left: 0;
+  padding-right: 0;
+}
+.logo,
+.logo img {
+  display: block;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+}
 .wordmark {
   font-weight: 700;
-  line-height: 1.05;
+  line-height: 1.2;
   font-size: 16px;
   color: #1c1c28;
-  letter-spacing: -0.03em;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
 }
 .nav {
   padding: 8px 12px 16px;

@@ -17,6 +17,7 @@ import type {
   DeleteJobResult,
   DeleteScheduleResult,
   DeleteServiceResult,
+  ExecutionLogView,
   ExecutionView,
   HealthStatus,
   InstanceView,
@@ -24,7 +25,12 @@ import type {
   JobView,
   ListResult,
   OperationAuditView,
+  Overview,
   PageQuery,
+  RegenerateAllResult,
+  RegenerateScheduleResult,
+  ScheduleTriggerView,
+  SchedulerStatus,
   PatchClientInput,
   PatchCredentialInput,
   PatchJobInput,
@@ -50,9 +56,23 @@ export const healthApi = {
   ready: () => requestHealth<HealthStatus>('/health/ready'),
 }
 
+export const overviewApi = {
+  get: () => request<Overview>('GET', '/v1/admin/overview'),
+}
+
+export const schedulerApi = {
+  get: () => request<SchedulerStatus>('GET', '/v1/admin/scheduler'),
+  regenerateAll: () => request<RegenerateAllResult>('POST', '/v1/admin/scheduler/regenerate', { body: {} }),
+}
+
+export const triggersApi = {
+  list: (query: PageQuery = {}) =>
+    request<ListResult<ScheduleTriggerView>>('GET', '/v1/admin/triggers', { query }).then(normalizeList),
+}
+
 export const servicesApi = {
   list: (query: PageQuery = {}) =>
-    request<ListResult<Service>>('GET', '/v1/admin/services', { query }).then(normalizeList),
+    request<ListResult<ServiceDetail>>('GET', '/v1/admin/services', { query }).then(normalizeList),
   get: (serviceId: string) => request<ServiceDetail>('GET', `/v1/admin/services/${serviceId}`),
   create: (body: CreateServiceInput) => request<Service>('POST', '/v1/admin/services', { body }),
   patch: (serviceId: string, body: PatchServiceInput) =>
@@ -64,6 +84,8 @@ export const servicesApi = {
 }
 
 export const jobsApi = {
+  listGlobal: (query: PageQuery = {}) =>
+    request<ListResult<JobView>>('GET', '/v1/admin/jobs', { query }).then(normalizeList),
   list: (serviceId: string, query: PageQuery = {}) =>
     request<ListResult<JobView>>('GET', `/v1/admin/services/${serviceId}/jobs`, { query }).then(
       normalizeList,
@@ -137,6 +159,23 @@ export const schedulesApi = {
       `/v1/admin/services/${serviceId}/jobs/${jobId}/schedules/${scheduleId}`,
       { query: hard ? { hard: true } : undefined },
     ),
+  listTriggers: (
+    serviceId: string,
+    jobId: string,
+    scheduleId: string,
+    query: PageQuery = {},
+  ) =>
+    request<ListResult<ScheduleTriggerView>>(
+      'GET',
+      `/v1/admin/services/${serviceId}/jobs/${jobId}/schedules/${scheduleId}/triggers`,
+      { query },
+    ).then(normalizeList),
+  regenerate: (serviceId: string, jobId: string, scheduleId: string) =>
+    request<RegenerateScheduleResult>(
+      'POST',
+      `/v1/admin/services/${serviceId}/jobs/${jobId}/schedules/${scheduleId}/regenerate`,
+      { body: {} },
+    ),
 }
 
 export const statesApi = {
@@ -161,6 +200,14 @@ export const statesApi = {
 }
 
 export const executionsApi = {
+  list: (query: PageQuery = {}) =>
+    request<ListResult<ExecutionView>>('GET', '/v1/admin/executions', { query }).then(normalizeList),
+  listByJob: (serviceId: string, jobId: string, query: PageQuery = {}) =>
+    request<ListResult<ExecutionView>>(
+      'GET',
+      `/v1/admin/services/${serviceId}/jobs/${jobId}/executions`,
+      { query },
+    ).then(normalizeList),
   trigger: (serviceId: string, jobId: string, body: TriggerExecutionInput) =>
     request<TriggerExecutionResult>(
       'POST',
@@ -172,6 +219,17 @@ export const executionsApi = {
       'GET',
       `/v1/admin/services/${serviceId}/jobs/${jobId}/executions/${executionId}`,
     ),
+  logs: (
+    serviceId: string,
+    jobId: string,
+    executionId: string,
+    query: PageQuery & { after?: number | string; attempt_id?: string } = {},
+  ) =>
+    request<ListResult<ExecutionLogView>>(
+      'GET',
+      `/v1/admin/services/${serviceId}/jobs/${jobId}/executions/${executionId}/logs`,
+      { query },
+    ).then(normalizeList),
   cancel: (serviceId: string, jobId: string, executionId: string, body: CancelExecutionInput = {}) =>
     request<CancelExecutionResult>(
       'POST',
@@ -181,6 +239,8 @@ export const executionsApi = {
 }
 
 export const instancesApi = {
+  listGlobal: (query: PageQuery = {}) =>
+    request<ListResult<InstanceView>>('GET', '/v1/admin/instances', { query }).then(normalizeList),
   list: (serviceId: string, query: PageQuery = {}) =>
     request<ListResult<InstanceView>>(
       'GET',

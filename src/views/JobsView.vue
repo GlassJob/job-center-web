@@ -9,7 +9,7 @@
       type="info"
       show-icon
       :closable="false"
-      title="当前先按服务聚合任务列表。服务或任务较多时可能未全部载入，建议之后提供全局任务查询接口。"
+      title="当前页只加载前 100 条全局任务，可继续用筛选缩小范围。"
       style="border-radius: 10px"
     />
 
@@ -32,7 +32,7 @@
         <el-input
           v-model="keyword"
           clearable
-          placeholder="搜索任务名称、编码或 Handler"
+          placeholder="搜索任务名称、编码或处理器"
           style="width: 260px"
           @keyup.enter="page = 1"
         />
@@ -74,9 +74,13 @@
             {{ formatTime(primarySchedule(row.schedules)?.next_fire_at) }}
           </template>
         </el-table-column>
-        <el-table-column label="最近执行" width="150">
-          <template #default>
-            <span class="placeholder" title="需任务列表附带 last_execution_* 或执行列表接口">待接入</span>
+        <el-table-column label="最近执行" width="160">
+          <template #default="{ row }">
+            <template v-if="row.job.last_execution_id">
+              <StatusTag :status="row.job.last_execution_status" />
+              <div class="jc-muted">{{ formatTime(row.job.last_execution_at) }}</div>
+            </template>
+            <span v-else class="placeholder">—</span>
           </template>
         </el-table-column>
         <el-table-column label="启用" width="80">
@@ -88,7 +92,7 @@
             />
           </template>
         </el-table-column>
-        <el-table-column label="Handler" min-width="150" show-overflow-tooltip>
+        <el-table-column label="处理器" min-width="150" show-overflow-tooltip>
           <template #default="{ row }">{{ row.job.handler || '—' }}</template>
         </el-table-column>
         <el-table-column label="操作" width="150" fixed="right">
@@ -125,13 +129,14 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { jobsApi } from '@/api'
-import type { ScheduleView } from '@/api/types'
+import type { ScheduleSummary } from '@/api/types'
 import type { ClusterJob } from '@/stores/cluster'
 import { useClusterStore } from '@/stores/cluster'
 import { toastError } from '@/utils/feedback'
 import { primarySchedule, scheduleSummary } from '@/utils/schedule'
 import { formatTime } from '@/utils/time'
 import PageHeader from '@/components/PageHeader.vue'
+import StatusTag from '@/components/StatusTag.vue'
 import TriggerJobDialog from '@/components/TriggerJobDialog.vue'
 
 const cluster = useClusterStore()
@@ -169,7 +174,7 @@ const paged = computed(() => {
   return filtered.value.slice(start, start + limit.value)
 })
 
-function scheduleStateText(schedules: ScheduleView[]) {
+function scheduleStateText(schedules: ScheduleSummary[]) {
   const on = schedules.filter((item) => item.enabled).length
   if (!schedules.length) return '未配置'
   if (!on) return '调度已停用'

@@ -11,54 +11,56 @@
       show-icon
       :closable="false"
       title="尚未配置管理端凭证"
-      description="请先到「连接设置」填写 Client ID / Secret。健康检查无需签名，但任务与实例数据需要 HMAC。"
+      description="请先到「连接设置」填写客户端 ID 和密钥。健康检查无需签名，但任务与实例数据需要 HMAC。"
       style="border-radius: 10px"
     />
 
     <div class="stat-grid">
       <button class="stat jc-card" type="button" @click="$router.push('/services')">
         <div class="stat-label">服务</div>
-        <div class="stat-value">{{ dash(cluster.services.length) }}</div>
+        <div class="stat-value">{{ dash(overview?.service_count) }}</div>
         <div class="stat-sub">已注册执行器 / 应用</div>
       </button>
       <button class="stat jc-card" type="button" @click="$router.push('/jobs')">
         <div class="stat-label">任务</div>
-        <div class="stat-value">{{ dash(cluster.jobs.length) }}</div>
-        <div class="stat-sub">启用 {{ cluster.enabledJobs.length }} 个</div>
+        <div class="stat-value">{{ dash(overview?.job_count) }}</div>
+        <div class="stat-sub">启用 {{ overview?.enabled_job_count ?? '—' }} 个</div>
       </button>
       <button class="stat jc-card" type="button" @click="$router.push('/instances')">
         <div class="stat-label">在线实例</div>
-        <div class="stat-value" :class="{ ok: cluster.onlineInstances.length > 0 }">
-          {{ dash(cluster.onlineInstances.length) }}
+        <div class="stat-value" :class="{ ok: (overview?.instance_counts.ONLINE || 0) > 0 }">
+          {{ dash(overview?.instance_counts.ONLINE) }}
         </div>
-        <div class="stat-sub">共 {{ cluster.instances.length }} 个实例</div>
+        <div class="stat-sub">共 {{ instanceTotal }} 个实例</div>
       </button>
       <button class="stat jc-card" type="button" @click="$router.push('/instances')">
         <div class="stat-label">异常实例</div>
-        <div class="stat-value" :class="{ bad: cluster.unhealthyInstances.length > 0 }">
-          {{ dash(cluster.unhealthyInstances.length) }}
+        <div class="stat-value" :class="{ bad: unhealthyCount > 0 }">
+          {{ dash(unhealthyCount) }}
         </div>
-        <div class="stat-sub">非 ONLINE 的执行器</div>
+        <div class="stat-sub">非在线的执行器</div>
       </button>
     </div>
 
     <div class="stat-grid reserved-grid">
-      <div class="stat jc-card reserved">
+      <div class="stat jc-card">
         <div class="stat-label">今日调度</div>
-        <div class="stat-value muted">—</div>
-        <div class="stat-sub">待接入概览统计接口</div>
+        <div class="stat-value">{{ dash(overview?.execution_today.total) }}</div>
+        <div class="stat-sub">今日创建的执行数</div>
       </div>
-      <div class="stat jc-card reserved">
+      <div class="stat jc-card">
         <div class="stat-label">今日成功 / 失败</div>
-        <div class="stat-value muted">— / —</div>
-        <div class="stat-sub">待接入执行汇总</div>
+        <div class="stat-value">
+          {{ dash(overview?.execution_today.success) }} / {{ dash(overview?.execution_today.failed) }}
+        </div>
+        <div class="stat-sub">取消 {{ overview?.execution_today.canceled ?? '—' }}</div>
       </div>
-      <div class="stat jc-card reserved">
+      <div class="stat jc-card">
         <div class="stat-label">运行中</div>
-        <div class="stat-value muted">—</div>
-        <div class="stat-sub">待接入执行列表</div>
+        <div class="stat-value">{{ dash(overview?.execution_today.running) }}</div>
+        <div class="stat-sub">排队 / 派发 / 执行中</div>
       </div>
-      <div class="stat jc-card reserved">
+      <div class="stat jc-card">
         <div class="stat-label">存活 / 就绪</div>
         <div class="stat-value" :class="tone(liveOk && readyOk)">
           {{ healthText }}
@@ -67,28 +69,63 @@
       </div>
     </div>
 
+    <div class="jc-card list-card scheduler-card">
+      <div class="list-head">
+        <div>
+          <h3>调度循环</h3>
+          <div class="scheduler-meta">
+            <template v-if="scheduler">
+              {{ scheduler.enabled ? '已启用' : '未启用' }}
+              <span v-if="scheduler.node_id" class="jc-code">{{ scheduler.node_id }}</span>
+            </template>
+            <template v-else-if="!loading">暂无数据</template>
+            <template v-else>—</template>
+          </div>
+        </div>
+        <div class="scheduler-actions">
+          <el-button link type="primary" @click="$router.push('/triggers')">触点列表</el-button>
+          <el-button link type="warning" :loading="regenLoading" @click="onRegenerateAll">全平台重生</el-button>
+        </div>
+      </div>
+      <div class="loop-grid">
+        <div v-for="item in loopItems" :key="item.key" class="loop-item">
+          <div class="loop-title">{{ item.label }}</div>
+          <StatusTag
+            :status="item.loop?.phase"
+            :label="phaseMeta(item.loop?.phase).label"
+            :tone="phaseMeta(item.loop?.phase).tone"
+          />
+          <div class="loop-detail">{{ item.loop?.detail || '—' }}</div>
+          <div v-if="item.loop?.last_result" class="loop-result">{{ item.loop.last_result }}</div>
+          <div class="loop-time">{{ formatTime(item.loop?.updated_at) }}</div>
+        </div>
+      </div>
+    </div>
+
     <div class="split">
       <div class="jc-card list-card">
         <div class="list-head">
           <h3>即将触发</h3>
-          <el-button link type="primary" @click="$router.push('/jobs')">全部任务</el-button>
+          <el-button link type="primary" @click="$router.push({ path: '/triggers', query: { status: 'PENDING' } })">
+            全部触点
+          </el-button>
         </div>
-        <el-empty v-if="!cluster.loading && cluster.upcomingSchedules.length === 0" description="没有已启用且带下次触发时间的调度" />
-        <el-table v-else :data="cluster.upcomingSchedules" @row-click="goJob">
+        <el-empty v-if="!loading && !(overview?.upcoming.length)" description="没有已启用且带下次触发时间的调度" />
+        <el-table v-else :data="overview?.upcoming || []" @row-click="goUpcoming">
           <el-table-column label="任务" min-width="180">
             <template #default="{ row }">
-              <div class="name">{{ row.job.name }}</div>
-              <div class="jc-code">{{ row.job.code }}</div>
+              <div class="name">{{ row.job_name }}</div>
+              <div class="jc-code">{{ row.job_code }}</div>
             </template>
           </el-table-column>
           <el-table-column label="服务" min-width="120">
-            <template #default="{ row }">{{ row.service.name }}</template>
+            <template #default="{ row }">{{ row.service_name }}</template>
           </el-table-column>
           <el-table-column label="Cron" min-width="140" show-overflow-tooltip>
-            <template #default="{ row }">{{ row.schedule.cron_expression || '—' }}</template>
+            <template #default="{ row }">{{ row.cron_expression || '—' }}</template>
           </el-table-column>
           <el-table-column label="下次触发" width="180">
-            <template #default="{ row }">{{ formatTime(row.next) }}</template>
+            <template #default="{ row }">{{ formatTime(row.next_fire_at) }}</template>
           </el-table-column>
         </el-table>
       </div>
@@ -116,9 +153,29 @@
     <div class="jc-card list-card">
       <div class="list-head">
         <h3>最近失败</h3>
-        <el-button link type="primary" disabled>执行记录</el-button>
+        <el-button link type="primary" @click="$router.push('/executions')">执行记录</el-button>
       </div>
-      <el-empty description="执行列表接口就绪后，这里会列出最近失败的任务，并跳转到执行详情和日志。" />
+      <el-empty v-if="!loading && !(overview?.recent_failed.length)" description="最近没有失败执行" />
+      <el-table v-else :data="overview?.recent_failed || []" @row-click="goFailed">
+        <el-table-column label="任务" min-width="180">
+          <template #default="{ row }">
+            <div class="name">{{ row.job_name || row.job_code }}</div>
+            <div class="jc-code">{{ row.execution_id }}</div>
+          </template>
+        </el-table-column>
+        <el-table-column label="服务" min-width="120">
+          <template #default="{ row }">{{ row.service_name || row.service_code }}</template>
+        </el-table-column>
+        <el-table-column label="状态" width="110">
+          <template #default="{ row }"><StatusTag :status="row.status" /></template>
+        </el-table-column>
+        <el-table-column label="错误" min-width="200" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.error_code || row.error_message || '—' }}</template>
+        </el-table-column>
+        <el-table-column label="结束时间" width="180">
+          <template #default="{ row }">{{ formatTime(row.finished_at) }}</template>
+        </el-table-column>
+      </el-table>
     </div>
   </div>
 </template>
@@ -126,10 +183,13 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { healthApi } from '@/api'
-import type { JobView, Service } from '@/api/types'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { healthApi, overviewApi, schedulerApi } from '@/api'
+import type { Overview, OverviewFailedItem, OverviewUpcomingItem, SchedulerStatus } from '@/api/types'
 import { useClusterStore } from '@/stores/cluster'
 import { useSettingsStore } from '@/stores/settings'
+import { toastError } from '@/utils/feedback'
+import { schedulerPhaseMeta } from '@/utils/status'
 import { formatTime } from '@/utils/time'
 import PageHeader from '@/components/PageHeader.vue'
 import StatusTag from '@/components/StatusTag.vue'
@@ -139,6 +199,23 @@ const cluster = useClusterStore()
 const router = useRouter()
 const liveOk = ref<boolean | null>(null)
 const readyOk = ref<boolean | null>(null)
+const overview = ref<Overview | null>(null)
+const scheduler = ref<SchedulerStatus | null>(null)
+const loading = ref(false)
+const regenLoading = ref(false)
+
+const loopItems = computed(() => {
+  const s = scheduler.value
+  return [
+    { key: 'claim', label: 'Claim', loop: s?.claim },
+    { key: 'generate', label: 'Generate', loop: s?.generate },
+    { key: 'queued', label: 'Queued', loop: s?.queued },
+  ]
+})
+
+function phaseMeta(phase?: string | null) {
+  return schedulerPhaseMeta(phase)
+}
 
 const healthText = computed(() => {
   if (liveOk.value == null) return '—'
@@ -147,8 +224,21 @@ const healthText = computed(() => {
   return '失败'
 })
 
-function dash(n: number) {
-  if (cluster.loading && !cluster.loadedAt) return '—'
+const instanceTotal = computed(() => {
+  const c = overview.value?.instance_counts
+  if (!c) return '—'
+  return c.REGISTERING + c.ONLINE + c.SUSPECT + c.OFFLINE + c.DRAINING
+})
+
+const unhealthyCount = computed(() => {
+  const c = overview.value?.instance_counts
+  if (!c) return 0
+  return c.REGISTERING + c.SUSPECT + c.OFFLINE + c.DRAINING
+})
+
+function dash(n: number | undefined | null) {
+  if (loading.value && overview.value == null) return '—'
+  if (n == null) return '—'
   return String(n)
 }
 
@@ -157,15 +247,42 @@ function tone(ok: boolean | null): string {
   return ok ? 'ok' : 'bad'
 }
 
-function goJob(row: { job: JobView; service: Service }) {
-  void router.push(`/services/${row.service.id}/jobs/${row.job.id}`)
+function goUpcoming(row: OverviewUpcomingItem) {
+  void router.push(`/services/${row.service_id}/jobs/${row.job_id}`)
 }
 
 function goInstance(row: { instance: { id: string }; service: { id: string } }) {
   void router.push(`/services/${row.service.id}/instances/${row.instance.id}`)
 }
 
+function goFailed(row: OverviewFailedItem) {
+  void router.push(`/services/${row.service_id}/jobs/${row.job_id}/executions/${row.execution_id}`)
+}
+
+async function onRegenerateAll() {
+  try {
+    await ElMessageBox.confirm(
+      '将对全部已启用且带 Cron 的排班执行先删再插。',
+      '全平台重生',
+      { type: 'warning', confirmButtonText: '重生', cancelButtonText: '取消' },
+    )
+  } catch {
+    return
+  }
+  regenLoading.value = true
+  try {
+    const out = await schedulerApi.regenerateAll()
+    ElMessage.success(`重生完成：成功 ${out.succeeded}/${out.total}` + (out.failed ? `，失败 ${out.failed}` : ''))
+    await reload()
+  } catch (err) {
+    toastError(err, '全平台重生失败')
+  } finally {
+    regenLoading.value = false
+  }
+}
+
 async function reload() {
+  loading.value = true
   try {
     liveOk.value = (await healthApi.live()).status === 'ok'
   } catch {
@@ -177,8 +294,20 @@ async function reload() {
     readyOk.value = false
   }
   if (settings.hasCredentials) {
+    try {
+      overview.value = await overviewApi.get()
+    } catch (err) {
+      toastError(err, '加载概览失败')
+    }
+    try {
+      scheduler.value = await schedulerApi.get()
+    } catch (err) {
+      scheduler.value = null
+      toastError(err, '加载调度状态失败')
+    }
     await cluster.refresh(true)
   }
+  loading.value = false
 }
 
 onMounted(() => {
@@ -203,7 +332,6 @@ onMounted(() => {
   background: #fff;
   cursor: pointer;
 }
-.stat.reserved { cursor: default; }
 .stat-label {
   color: var(--jc-text-muted);
   font-size: 12px;
@@ -217,7 +345,6 @@ onMounted(() => {
 }
 .stat-value.ok { color: var(--jc-success); }
 .stat-value.bad { color: var(--jc-danger); }
-.stat-value.muted { color: var(--jc-text-muted); }
 .stat-sub {
   margin-top: 4px;
   color: var(--jc-text-secondary);
@@ -239,5 +366,43 @@ onMounted(() => {
   margin-bottom: 12px;
 }
 .list-head h3 { margin: 0; font-size: 15px; }
+.scheduler-actions { display: flex; gap: 4px; align-items: center; }
+.scheduler-meta {
+  margin-top: 4px;
+  color: var(--jc-text-secondary);
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.loop-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+@media (max-width: 900px) {
+  .loop-grid { grid-template-columns: 1fr; }
+}
+.loop-item {
+  padding: 12px 14px;
+  border: 1px solid var(--jc-border);
+  border-radius: 10px;
+  background: #fafafa;
+}
+.loop-title {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.loop-detail,
+.loop-result,
+.loop-time {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--jc-text-secondary);
+  word-break: break-word;
+}
+.loop-result { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 .name { font-weight: 600; }
 </style>

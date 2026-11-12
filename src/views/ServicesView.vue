@@ -161,15 +161,7 @@ async function fetchList() {
       limit: limit.value,
     })
     total.value = res.total
-    list.value = await Promise.all(
-      res.list.map(async (item) => {
-        try {
-          return await servicesApi.get(item.id)
-        } catch {
-          return { ...item, job_count: 0, instance_count: 0, credential_count: 0 }
-        }
-      }),
-    )
+    list.value = res.list
   } catch (err) {
     toastError(err, '加载服务失败')
   } finally {
