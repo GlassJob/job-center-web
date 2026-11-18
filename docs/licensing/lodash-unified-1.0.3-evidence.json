@@ -1,0 +1,17 @@
+{
+  "name": "lodash-unified",
+  "version": "1.0.3",
+  "license": "MIT",
+  "author": "Jack Works",
+  "source": "https://registry.npmjs.org/lodash-unified/1.0.3",
+  "tarball": "https://registry.npmjs.org/lodash-unified/-/lodash-unified-1.0.3.tgz",
+  "integrity": "sha512-WK9qSozxXOD7ZJQlpSqOT+om2ZfcT4yO+03FuzAHD0wF6S0l0090LRPDx3vhTTLZ8cFKpBn+IOcVXK6qOcIlfQ==",
+  "shasum": "80b1eac10ed2eb02ed189f08614a29c27d07c894",
+  "published_files": [
+    "require.cjs",
+    "import.js",
+    "package.json",
+    "type.d.ts"
+  ],
+  "result": "MIT declaration verified; original copyright/license text not located; distribution review remains open."
+}

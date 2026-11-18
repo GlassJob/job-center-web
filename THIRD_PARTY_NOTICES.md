@@ -130,3 +130,9 @@
 | `vue-router` | 5.4.0 | MIT |
 | `vue-tsc` | 3.3.14 | MIT |
 | `webpack-virtual-modules` | 0.6.2 | MIT |
+
+## 缺失原文的继续追溯（2026-11-18）
+
+已复核 npm 对应版本元数据及发布 tarball（仅四个文件），该版本没有 LICENSE、README、repository 或 gitHead。作者名为 Jack Works、声明 MIT 可从发布元数据确认，但不能据此伪造其原始版权通知。上游仓库搜索、公开许可证索引和公开帖子未提供额外原文。精确版本、包校验值及发布来源保存在 [追溯证据](./docs/licensing/lodash-unified-1.0.3-evidence.json)。
+
+此项保持未结，分发验收应等维护者提供对应版本原文，或另行评估并验证替代方案；本次未发送外部消息、未擅自替换依赖。
