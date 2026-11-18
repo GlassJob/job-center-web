@@ -77,3 +77,7 @@ hex(sha256(body))
 - 签名为 `HMAC-SHA256(canonical, client_secret)` 的小写十六进制，通过 Web Crypto 在浏览器内计算
 
 请求头：`X-JC-Client-Id`、`X-JC-Timestamp`、`X-JC-Nonce`、`X-JC-Operator-Id`、`X-JC-Operator-Name`、`X-JC-Signature`。
+
+## 许可证
+
+本项目原创代码采用 [Apache License 2.0](./LICENSE)。第三方依赖、图标与字体仍遵循各自的许可证，不因本项目的许可声明而改变。依赖与资源说明见 [第三方许可清单](./THIRD_PARTY_NOTICES.md)。
